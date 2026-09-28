@@ -1,0 +1,22 @@
+# Spustitelné binární soubory a objektové soubory
+*.o
+*.so
+*.a
+*.out
+ifj26
+compiler
+
+# Archivy
+*.zip
+*.tar.gz
+
+# Editor / IDE specifické složky a soubory
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
+*.swp
+
+# OS balast
+.DS_Store
+Thumbs.db
