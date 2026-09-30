@@ -34,11 +34,16 @@ format:
 
 dir_build:
 	@mkdir -p $(BUILD_DIR)
+tidy-check:
+	@clang-tidy $(SRCS) -- $(CFLAGS)
+
+tidy-fix:
+	@clang-tidy $(SRCS) --fix -- $(CFLAGS)
 
 docs :
 	doxygen
 
-.PHONY: all clean  dir_build  docs format
+.PHONY: all clean  dir_build  docs format tidy-check tidy-fix
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)  $(DOCDIR)
