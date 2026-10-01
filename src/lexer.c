@@ -181,6 +181,157 @@ Token lex_identificator(LexerCtx *ctx) {
   }
 }
 
+Token lex_numbers(LexerCtx *ctx) {
+  State current_state = S_START;
+
+  while (1) {
+    int c = fgetc(ctx->input);
+    fprintf(stderr, "[debug]: .... dealing with char: '%c' (%d)\n", (char)c, c);
+    char input_char = (char)c;
+    switch (current_state) {
+    case S_START:
+      if (c == '0') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT_ZERO;
+      } else if (c == '-') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_MINUS;
+      } else if (c >= '1' && c <= '9') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT;
+      } else if (c == '.') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOT_DOUBLE;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_INT_ZERO:
+      if (isdigit(c)) {
+        return MAKE_TOKEN_ERROR();
+      } else if (c == '.') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOT_DOUBLE;
+      } else if (c == 'e' || c == 'E') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_E;
+      } else {
+        ungetc(c, ctx->input);
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
+      }
+      break;
+
+    case S_INT:
+      if (c == '_') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT_UNDERSCORE;
+      } else if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        // loop, kdy dostává čísla
+      } else if (c == '.') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOT_DOUBLE;
+      } else if (c == 'e' || c == 'E') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_E;
+      } else {
+        ungetc(c, ctx->input);
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
+      }
+      break;
+
+    case S_MINUS:
+      if (c == '0') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT_ZERO;
+      } else if (c >= '1' && c <= '9') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT;
+      }
+      break;
+
+    case S_INT_UNDERSCORE:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_INT;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_DOUBLE_E:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_UNDERSCORE_AFTER_E;
+      } else if (c == '-' || c == '+') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_UNDERSCORE_AFTER_E;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_DOUBLE_E_SIGN:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_AFTER_E;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_DOUBLE_AFTER_E:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        // loop čísel
+      } else if (c == '_') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_UNDERSCORE_AFTER_E;
+      } else if (c == 'd' || c == 'D') {
+        sb_append_char(&ctx->Buffer, input_char);
+        return MAKE_TOKEN_LEXEME(
+            T_DOUBLE_LITERAL,
+            &ctx->Buffer); // Tady nemusím dávat stav, kdy to jde do
+                           // S_DOUBLE_END_D, jelikož to rovnou udělá int/double
+      } else {
+        ungetc(c, ctx->input);
+        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+      }
+      break;
+
+    case S_DOUBLE_UNDERSCORE_AFTER_E:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_AFTER_E;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_DOT_DOUBLE:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+      } else if (c == 'e' || c == 'E') {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_E;
+      } else if (c == 'd' || c == 'D') {
+        sb_append_char(&ctx->Buffer, input_char);
+        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+      } else {
+        ungetc(c, ctx->input);
+        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+      }
+      break;
+    default:
+      // this should never happen!!
+      assert(false && "Lex integer/double state machine fell through!");
+      return MAKE_TOKEN_ERROR();
+      break;
+    }
+  }
+}
+
 int skip_white_space(LexerCtx *ctx) {
   while (1) {
     int c = fgetc(ctx->input);
@@ -226,6 +377,12 @@ Token get_next_token(LexerCtx *ctx) {
   if (c == '\n') {
     ctx->at_start_of_line = true;
     return MAKE_TOKEN_WHITESPACE(T_EOL);
+  }
+
+  if (c == '0' || isdigit(c) || c == '-') {
+    fprintf(stderr, "[debug]: .... putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    return lex_numbers(ctx);
   }
 
   return MAKE_TOKEN_ERROR();

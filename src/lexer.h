@@ -125,6 +125,9 @@ void free_token(Token t);
 // Funkce na počítání whitespace
 Token lex_indents(LexerCtx *ctx);
 
+// Funkce na řešení integer / double
+Token lex_numbers(LexerCtx *ctx);
+
 /**
  * @brief Funkce tvořící tokeny (filtruje EOL tokeny)
  *
