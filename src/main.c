@@ -5,7 +5,7 @@ int main(void) {
   lexer_init(&lexer_ctx, stdin);
   while (true) {
     Token token = get_next_token(&lexer_ctx);
-    printf("dealing with token %d\n", token.token_type);
+    printf("dealing with token %s\n", token_to_string(token.token_type));
     if (token.token_type == T_EOF) {
       break;
     }

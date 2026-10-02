@@ -20,13 +20,13 @@ TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 TEST_OBJS := $(patsubst $(TEST_DIR)/%.c, $(BUILD_DIR)/%.o, $(TEST_SRCS))
 TEST_DEP_OBJS := $(filter-out $(BUILD_DIR)/main.o, $(OBJS))
 
-all: $(TARGET) 
+all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ 
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c $(HEADERS) | dir_build
-	$(CC) $(CFLAGS)  -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 
 format:

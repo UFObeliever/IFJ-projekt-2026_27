@@ -50,6 +50,8 @@ typedef enum TokenType {
   T_ERROR,
   T_EOF,
   T_EOL,
+  T_DOUBLE_DOT,
+  T_WHITESPACE_SEP,
 } TokenType;
 
 typedef enum State {
@@ -96,6 +98,7 @@ typedef enum State {
   S_START_BLOCK_COMMENT_1,
   S_IN_BLOCK_COMMENT,
   S_BLOCK_COMMENT_END_1,
+  S_BLOCK_COMMENT_END_2,
 } State;
 
 typedef struct {
@@ -160,5 +163,18 @@ void lexer_free(LexerCtx *ctx);
  * @param ctx: Kontext bufferu
  */
 Token keyword_check(const LexerCtx *ctx);
+
+/**
+ * @brief Makes a string from token type enum
+ */
+const char *token_to_string(TokenType token);
+
+Token lex_equal(LexerCtx *ctx);
+
+Token lex_compare_l(LexerCtx *ctx);
+
+Token lex_compare_g(LexerCtx *ctx);
+
+Token lex_not_equal(LexerCtx *ctx);
 
 #endif
