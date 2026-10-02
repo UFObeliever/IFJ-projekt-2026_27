@@ -16,6 +16,7 @@ compiler
 !.vscode/tasks.json
 .idea/
 *.swp
+/build
 
 # OS balast
 .DS_Store

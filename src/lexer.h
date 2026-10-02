@@ -66,31 +66,32 @@ typedef enum State {
   S_DOUBLE_AFTER_E,
   S_DOUBLE_UNDERSCORE_AFTER_E,   // Koncový stav floatu
   S_DOUBLE_UNDERSCORE_AFTER_DOT, //
-  S_LTE,            // state less than or equal (pro porovnávací operátory)
-  S_LT,             // state less than
-  S_GTE,            // state greater than or equal to
-  S_GT,             // state greater than
-  S_NOT_EQUAL,      // State not equal
-  S_ASSIGN,         // State assign
-  S_IN_MULTILINE,   // State in multiline comment
-  S_END_MULTILINE,  // End of multiline comment
-  S_STR_START,      // Q1 STRING
-  S_STR_END,        // Q2
-  S_STR_IN_STR,     // Q3
-  S_STR_BACKSLASH,  // Q4
-  S_STR_ESC_SEQ,    // Q5 STRING END
-  S_MSTR_START_1,   // Q1 MULT. LINE STRING
-  S_MSTR_START_2,   // Q2
-  S_MSTR_START_3,   // Q3
-  S_MSTR_IN_STR,    // Q8
-  S_MSTR_AFTER_NL,  // Q9
-  S_MSTR_END_1,     // Q4
-  S_MSTR_END_2,     // Q5
-  S_MSTR_END_3,     // Q6 MULT LINE STRING END
-  S_BACKSLASH_COMM, // Q1 COMMENTS
-  S_SINGLE_COMM_START,  // Q2
-  S_SINGLE_COMM_END,    // Q3 SINGLE LINE COMMENT
-  S_START_LINE_COMMENT, // CHECK THIS IS IT IS FOR NESTED LINE COMMENTS
+  S_LTE,           // state less than or equal (pro porovnávací operátory)
+  S_LT,            // state less than
+  S_GTE,           // state greater than or equal to
+  S_GT,            // state greater than
+  S_NOT_EQUAL,     // State not equal
+  S_ASSIGN,        // State assign
+  S_STR_START,     // Q1 STRING
+  S_STR_END,       // Q2
+  S_STR_IN_STR,    // Q3
+  S_STR_BACKSLASH, // Q4
+  S_STR_ESC_SEQ,   // Q5 STRING END
+  S_STR_NEWLINE_CHAR,
+  S_STR_MULTILINE_START, // State in multiline str
+  S_STR_MULTILINE_END,   // End of multiline str
+  S_MSTR_START_1,        // Q1 MULT. LINE STRING
+  S_MSTR_START_2,        // Q2
+  S_MSTR_START_3,        // Q3
+  S_MSTR_IN_STR,         // Q8
+  S_MSTR_AFTER_NL,       // Q9
+  S_MSTR_END_1,          // Q4
+  S_MSTR_END_2,          // Q5
+  S_MSTR_END_3,          // Q6 MULT LINE STRING END
+  S_BACKSLASH_COMM,      // Q1 COMMENTS
+  S_SINGLE_COMM_START,   // Q2
+  S_SINGLE_COMM_END,     // Q3 SINGLE LINE COMMENT
+  S_START_LINE_COMMENT,  // CHECK THIS IS IT IS FOR NESTED LINE COMMENTS
   S_IN_LINE_COMMENT,
   S_START_BLOCK_COMMENT_1,
   S_IN_BLOCK_COMMENT,
@@ -127,6 +128,9 @@ Token lex_indents(LexerCtx *ctx);
 
 // Funkce na řešení integer / double
 Token lex_numbers(LexerCtx *ctx);
+
+// Fce na řešení stringu / vnořené str
+Token lex_string(LexerCtx *ctx);
 
 /**
  * @brief Funkce tvořící tokeny (filtruje EOL tokeny)

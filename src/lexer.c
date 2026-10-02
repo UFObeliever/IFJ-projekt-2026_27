@@ -263,7 +263,7 @@ Token lex_numbers(LexerCtx *ctx) {
     case S_DOUBLE_E:
       if (isdigit(c)) {
         sb_append_char(&ctx->Buffer, input_char);
-        current_state = S_DOUBLE_UNDERSCORE_AFTER_E;
+        current_state = S_DOUBLE_AFTER_E;
       } else if (c == '-' || c == '+') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_UNDERSCORE_AFTER_E;

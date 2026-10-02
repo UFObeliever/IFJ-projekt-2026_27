@@ -1,0 +1,17 @@
+
+val zero: Int = 0
+val positive: Int = 42
+val negative: Int = -15
+val with_underscore: Int = 1_000_000
+
+val d_zero: Double = 0.0
+val d_simple: Double = 3.14159
+val d_negative: Double = -0.5
+
+val exp1: Double = 12.34e5
+val exp2: Double = 12.34E-5
+val exp_zero: Double = 0.0e0
+
+val suff_lower: Double = 100.0d
+val suff_upper: Double = 50.5D
+val suff_exp: Double = 1.2e3d
