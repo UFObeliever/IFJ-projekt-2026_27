@@ -15,8 +15,8 @@
 /**
  * @brief Makro na vytvoření tokenu odsadzení
  *
- * @param TYPE: typ tokenu
- * @param COUNT: počet odsadzení
+ * @param TYPE: typ_tokenu
+ * @param COUNT: počet_odsadzení
  *
  */
 #define MAKE_TOKEN_INDENTS(TYPE, COUNT)                                        \
