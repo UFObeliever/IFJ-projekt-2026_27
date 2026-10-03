@@ -1,6 +1,6 @@
 #Makefile
 CC := gcc
-CFLAGS := -Wall -Wextra -g
+CFLAGS := -Wall -Wextra -g -DNDEBUG
 BUILD_DIR = build
 DOCDIR := doc
 

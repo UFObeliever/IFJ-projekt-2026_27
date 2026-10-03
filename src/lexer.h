@@ -33,10 +33,6 @@ typedef enum TokenType {
   T_MULT_SIGN,
   T_OPEN_BRACKET,  // (
   T_CLOSE_BRACKET, // )
-  T_OPEN_PAREN,
-  T_CLOSE_PAREN,
-  T_OPEN_CURLY_BRACES,
-  T_CLOSE_CURLY_BRACES,
   T_COMMA,
   T_EQUAL,  // token equal
   T_ASSIGN, // token ASSIGN (přiřazení)
@@ -45,13 +41,15 @@ typedef enum TokenType {
   T_LTE,
   T_GT,
   T_GTE,
-  T_FUNCTION,
   T_INDENTS, // odsazení
   T_ERROR,
   T_EOF,
   T_EOL,
   T_DOUBLE_DOT,
   T_WHITESPACE_SEP,
+  T_FUNC_MAIN,
+  T_DOT,
+  T_UNIT_LITERAL,
 } TokenType;
 
 typedef enum State {
@@ -61,7 +59,6 @@ typedef enum State {
   S_INT_ZERO,   // INTEGER ONLY SOLO ZERO CHECK
   S_INT,        // INTEGER
   S_INT_UNDERSCORE,
-  S_MINUS,      // OPTIONAL NEGATIVE INT
   S_DOT_DOUBLE, // S_DOUBLE ORIGINALLY
   S_DOUBLE_E,
   S_DOUBLE_E_SIGN, // DOUBLE +/- OPTIONAL
@@ -99,6 +96,26 @@ typedef enum State {
   S_IN_BLOCK_COMMENT,
   S_BLOCK_COMMENT_END_1,
   S_BLOCK_COMMENT_END_2,
+  S_INDENT_START,
+  S_INDENT_HAS_TAB,
+  S_IN_COM,      // S_IN_STR
+  S_MCOM_SINGLE, // MSTR -> nahrazeno MCOM
+  S_MCOM_SINGLE_END_STAR,
+  S_MCOM_SINGLE_END,
+  S_MCOM_MULTILINE,
+  S_MCOM_SINGLE_NEST_BACKSLASH,
+  S_MCOM_SINGLE_NEST_STAR_START,
+  S_MCOM_SINGLE_NEST_STAR_STAR,
+  S_MCOM_MULT_STAR,
+  S_MCOM_MULT_NEST_BACKSLASH,
+  S_MCOM_MULT_BACKSLASH,
+  S_MCOM_MULT_END,
+  S_MAIN_AT,
+  S_MAIN_M,
+  S_MAIN_A,
+  S_MAIN_I,
+  S_MAIN_N,
+
 } State;
 
 typedef struct {
@@ -109,18 +126,17 @@ typedef struct {
 typedef struct {
   TokenType type;
   int count;
-} Token_indents;
+} token_indents;
 
 typedef union {
   TokenType token_type;
   Token_lexeme token_lexeme;
-  Token_indents Token_indents;
+  token_indents token_indents;
 } Token;
 
 typedef struct {
   StringBuff Buffer;
   FILE *input;
-  bool at_start_of_line;
 } LexerCtx;
 
 // Uvolní paměť tokenu
@@ -167,7 +183,7 @@ Token keyword_check(const LexerCtx *ctx);
 /**
  * @brief Makes a string from token type enum
  */
-const char *token_to_string(TokenType token);
+const char *token_type_to_string(TokenType token);
 
 Token lex_equal(LexerCtx *ctx);
 
@@ -176,5 +192,9 @@ Token lex_compare_l(LexerCtx *ctx);
 Token lex_compare_g(LexerCtx *ctx);
 
 Token lex_not_equal(LexerCtx *ctx);
+
+void print_token(const Token *token);
+
+Token lex_main_func(LexerCtx *ctx);
 
 #endif

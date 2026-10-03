@@ -17,7 +17,7 @@
  *
  * @param TYPE: typ tokenu
  */
-#define MAKE_TOKEN_MISC(TYPE)                                                  \
+#define MAKE_TOKEN(TYPE)                                                       \
   (Token) { .token_type = (TYPE) }
 
 /**
@@ -27,9 +27,9 @@
  * @param COUNT: počet odsadzení
  *
  */
-#define MAKE_TOKEN_INDENTS(TYPE, COUNT)                                        \
+#define MAKE_TOKEN_INDENTS(COUNT)                                              \
   (Token) {                                                                    \
-    .Token_indents = {.type = (TYPE), .count = (COUNT) }                       \
+    .token_indents = {.type = T_INDENTS, .count = (COUNT) }                    \
   }
 
 /**
@@ -41,14 +41,6 @@
  */
 #define MAKE_TOKEN_ERROR()                                                     \
   (Token) { .token_type = (T_ERROR) }
-
-/**
- * @brief Makro na vytvoření tokenu bílých znakú
- *
- * @param TYPE: typ tokenu
- */
-#define MAKE_TOKEN_WHITESPACE(TYPE)                                            \
-  (Token) { .token_type = (TYPE) }
 
 /**
  * @brief Makro na vytvoření tokenu keywordu
@@ -74,13 +66,12 @@
 #define DEBUG_LOG(fmt, ...) ((void)0)
 #else
 #define DEBUG_LOG(fmt, ...)                                                    \
-  fprintf(stderr, "[%s:%s:%d]", __FILE__, __func__, __LINE__);                 \
+  fprintf(stderr, "[%s:%d](%s)", __FILE__, __LINE__, __func__);                \
   fprintf(stderr, fmt, ##__VA_ARGS__);
 #endif
 
 void lexer_init(LexerCtx *ctx, FILE *input) {
   ctx->input = input;
-  ctx->at_start_of_line = true;
   sb_init(&ctx->Buffer, 16);
 }
 
@@ -124,33 +115,45 @@ Token keyword_check(const LexerCtx *ctx) {
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
 }
 
-Token lex_indents(LexerCtx *ctx) {
+Token lex_white_space(LexerCtx *ctx) {
   int num_indents = 0;
-  bool has_tab = false;
+  State current_state = S_INDENT_START;
   while (1) {
     int c = fgetc(ctx->input);
     DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
-
-    if (c == ' ') {
-      num_indents++;
-    } else if (c == '\t') {
-      has_tab = true;
-    } else if (c == '\r') {
-      continue; // ignore this fucker
-    } else if (c == '\n') {
-      // reset .... previous line was just full of white space
-      num_indents = 0;
-      has_tab = false;
-    } else {
-      if (has_tab) {
-        return MAKE_TOKEN_ERROR();
+    switch (current_state) {
+    case S_INDENT_START:
+      if (c == '\t') {
+        current_state = S_INDENT_HAS_TAB;
+      } else if (c == ' ') {
+        num_indents++;
+      } else if (c == '\r') {
+        continue; // ignore \r ....for windows compatibility
+      } else {
+        ungetc(c, ctx->input);
+        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+        return MAKE_TOKEN_INDENTS(num_indents);
       }
-      ungetc(c, ctx->input);
-      DEBUG_LOG("putting back char: '%c' (%d)\n", (char)c, c);
+      break;
+    case S_INDENT_HAS_TAB:
+      if (c == '\n') {
+        return MAKE_TOKEN(T_EOL);
+      } else if (c == ' ' || c == '\t' || c == '\r') {
+        continue; // stay in this state
+      } else if (c == EOF) {
+        return MAKE_TOKEN(T_EOF);
+      } else {
+        return MAKE_TOKEN(T_WHITESPACE_SEP);
+      }
+      break;
+
+    default:
+      // should never happen!!
+      assert(false && "State machine for indents fell through!");
+      return MAKE_TOKEN_ERROR();
       break;
     }
   }
-  return MAKE_TOKEN_INDENTS(T_INDENTS, num_indents);
 }
 
 Token lex_identificator(LexerCtx *ctx) {
@@ -209,9 +212,6 @@ Token lex_numbers(LexerCtx *ctx) {
       if (c == '0') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_INT_ZERO;
-      } else if (c == '-') {
-        sb_append_char(&ctx->Buffer, input_char);
-        current_state = S_MINUS;
       } else if (c >= '1' && c <= '9') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_INT;
@@ -256,16 +256,6 @@ Token lex_numbers(LexerCtx *ctx) {
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
-      }
-      break;
-
-    case S_MINUS:
-      if (c == '0') {
-        sb_append_char(&ctx->Buffer, input_char);
-        current_state = S_INT_ZERO;
-      } else if (c >= '1' && c <= '9') {
-        sb_append_char(&ctx->Buffer, input_char);
-        current_state = S_INT;
       }
       break;
 
@@ -485,95 +475,150 @@ Token lex_string(LexerCtx *ctx) {
   }
 }
 
-// Token lex_div_com(LexerCtx *ctx) {
-//   State current_state = S_BACKSLASH_COMM;
-//   int comment_nesting = 0;
-//   bool has_new_line = false;
-//   while (1) {
-//     int c = fgetc(ctx->input);
-//     DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
-//     switch (current_state) {
-//     case S_BACKSLASH_COMM:
-//       if (c == '/') {
-//         current_state = S_SINGLE_COMM_START;
-//       } else if (c == '*') {
-//         comment_nesting++;
-//         current_state = S_START_BLOCK_COMMENT_1;
-//       } else {
-//         return MAKE_TOKEN_MISC(T_DIVIDE);
-//       }
-//       break;
+Token lex_div_com(LexerCtx *ctx) {
+  State current_state = S_BACKSLASH_COMM;
+  int comment_nesting = 0;
 
-//     case S_SINGLE_COMM_START:
-//       if (c == '\n' || c == EOF) {
-//         return MAKE_TOKEN_MISC(T_EOL);
-//       }
-//       break;
+  while (1) {
+    int c = fgetc(ctx->input);
+    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+    switch (current_state) {
+    case S_BACKSLASH_COMM:
+      if (c == '/') {
+        current_state = S_IN_COM;
+      } else if (c == '*') {
+        current_state = S_MCOM_SINGLE;
+      } else {
+        return MAKE_TOKEN(T_DIVIDE);
+      }
+      break;
 
-//     case S_START_BLOCK_COMMENT_1:
-//       DEBUG_LOG("S_START_BLOCK_COMMNET_1\n");
-//       if (c == EOF) {
-//         return MAKE_TOKEN_ERROR();
-//       } else if (c == '/') {
-//         current_state = S_IN_BLOCK_COMMENT;
-//       } else if (c == '*') {
-//         current_state = S_BLOCK_COMMENT_END_1;
-//       } else if (c == '\n') {
-//         has_new_line = true;
-//       }
-//       break;
+    case S_IN_COM:
+      if (c == '\n') {
+        return MAKE_TOKEN(T_EOL);
+      } else if (c == EOF) {
+        return MAKE_TOKEN(T_EOF);
+      }
+      break;
 
-//     case S_IN_BLOCK_COMMENT:
-//       DEBUG_LOG("S_IN_BLOCK_COMMENT\n");
-//       if (c == EOF) {
-//         return MAKE_TOKEN_ERROR();
-//       }
-//       if (c == '*') {
-//         comment_nesting++;
-//       }
-//       if (c == '\n') {
-//         has_new_line = true;
-//       }
-//       current_state = S_START_BLOCK_COMMENT_1;
-//       break;
+    case S_MCOM_SINGLE:
+      if (c == '\n') {
+        current_state = S_MCOM_MULTILINE;
+      } else if (c == '*') {
+        current_state = S_MCOM_SINGLE_END_STAR;
+      } else if (c == '/') {
+        current_state = S_MCOM_SINGLE_NEST_BACKSLASH;
+      } else if (c == EOF) {
+        return MAKE_TOKEN_ERROR();
+      } else {
+        current_state = S_MCOM_SINGLE;
+      }
+      break;
 
-//     case S_BLOCK_COMMENT_END_1:
-//       DEBUG_LOG("S_BLOCK_COMMENT_END_1\n");
-//       if (c == EOF) {
-//         return MAKE_TOKEN_ERROR();
-//       }
-//       if (c == '\n') {
-//         has_new_line = true;
-//       }
-//       if (c == '/') {
-//         comment_nesting--;
-//         if (comment_nesting == 0) {
-//           if (has_new_line) {
-//             return MAKE_TOKEN_MISC(T_WHITESPACE_SEP);
-//           }
-//           current_state = S_BLOCK_COMMENT_END_2;
-//         }
-//       } else {
-//         current_state = S_START_BLOCK_COMMENT_1;
-//       }
-//       break;
-//     case S_BLOCK_COMMENT_END_2:
-//       DEBUG_LOG("S_BLOCK_COMMENT_END_2\n");
-//       if (c == '\n' || c == EOF) {
-//         return MAKE_TOKEN_WHITESPACE(T_EOL);
-//       } else if (c == ' ' || c == '\t' || c == '\r') {
-//         continue; // ignore this
-//       } else {
-//         return MAKE_TOKEN_ERROR();
-//       }
-//     default:
-//       // should never happen!!!!
-//       assert(false && "Lex comment state machine fell through!");
-//       return MAKE_TOKEN_ERROR();
-//       break;
-//     }
-//   }
-// }
+    case S_MCOM_SINGLE_END_STAR:
+      if (c == '/') {
+        return MAKE_TOKEN(T_WHITESPACE_SEP); // S_MSTR_SINGLE_END mělo by stačit
+      } else if (c == EOF) {
+        ungetc(c, ctx->input);
+        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+        return MAKE_TOKEN_ERROR();
+      } else if (c == '\n') {
+        current_state = S_MCOM_MULTILINE;
+      } else {
+        current_state = S_MCOM_SINGLE;
+      }
+      break;
+
+    case S_MCOM_SINGLE_NEST_BACKSLASH:
+      if (c == '*') {
+        comment_nesting++;
+        current_state = S_MCOM_SINGLE_NEST_STAR_START;
+      } else if (c == '\n') {
+        current_state = S_MCOM_MULTILINE;
+      } else {
+        current_state = S_MCOM_SINGLE;
+      }
+      break;
+
+    case S_MCOM_SINGLE_NEST_STAR_START:
+      if (c == '*') {
+        current_state = S_MCOM_SINGLE_NEST_STAR_STAR;
+      } else if (c == '\n') {
+        current_state = S_MCOM_MULTILINE;
+      } else {
+        current_state = S_MCOM_SINGLE_NEST_STAR_START; // continue teoreticky
+      }
+      break;
+
+    case S_MCOM_SINGLE_NEST_STAR_STAR:
+      if (c == '/') {
+        comment_nesting--;
+        if (comment_nesting == 0) {
+          current_state = S_MCOM_SINGLE;
+        } else {
+          current_state = S_MCOM_SINGLE_NEST_BACKSLASH;
+        }
+      } else if (c == '\n') {
+        current_state = S_MCOM_MULTILINE;
+      } else {
+        current_state = S_MCOM_SINGLE_NEST_STAR_STAR;
+      }
+      break;
+
+    case S_MCOM_MULTILINE:
+      if (c == '*') {
+        current_state = S_MCOM_MULT_STAR;
+      } else if (c == '/') {
+        current_state = S_MCOM_MULT_NEST_BACKSLASH;
+      } else if (c == EOF) {
+        return MAKE_TOKEN_ERROR();
+      } else {
+        current_state = S_MCOM_MULTILINE;
+      }
+      break;
+
+    case S_MCOM_MULT_STAR:
+      if (c == '/') {
+        // nepotřebné ? current_state = S_MCOM_MULT_BACKSLASH;
+        if (comment_nesting == 0) {
+          current_state = S_MCOM_MULT_END;
+        } else {
+          comment_nesting--;
+          current_state = S_MCOM_MULTILINE;
+        }
+      } else {
+        current_state = S_MCOM_MULTILINE;
+      }
+      break;
+
+    case S_MCOM_MULT_END:
+      if (c == '\n' || c == EOF) {
+        if (c == EOF) {
+          ungetc(c, ctx->input);
+          DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+        }
+        return MAKE_TOKEN(T_EOL);
+      } else if (c == ' ' || c == '\t' || c == '\r') {
+        continue;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_MCOM_MULT_NEST_BACKSLASH:
+      if (c == '*') {
+        comment_nesting++;
+      }
+      current_state = S_MCOM_MULTILINE;
+      break;
+
+    default:
+      assert(false && "Lex comments state machine fell through!");
+      return MAKE_TOKEN_ERROR();
+      break;
+    }
+  }
+}
 
 int skip_white_space(LexerCtx *ctx) {
   while (1) {
@@ -588,12 +633,13 @@ int skip_white_space(LexerCtx *ctx) {
 
 Token lex_equal(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
+  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
-    return MAKE_TOKEN_MISC(T_EQUAL);
+    return MAKE_TOKEN(T_EQUAL);
   } else {
     ungetc(c, ctx->input);
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    return MAKE_TOKEN_MISC(T_ASSIGN);
+    return MAKE_TOKEN(T_ASSIGN);
   }
 }
 
@@ -601,11 +647,11 @@ Token lex_compare_l(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
-    return MAKE_TOKEN_MISC(T_LTE);
+    return MAKE_TOKEN(T_LTE);
   } else {
     ungetc(c, ctx->input);
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    return MAKE_TOKEN_MISC(T_LT);
+    return MAKE_TOKEN(T_LT);
   }
 }
 
@@ -613,11 +659,11 @@ Token lex_compare_g(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
-    return MAKE_TOKEN_MISC(T_GTE);
+    return MAKE_TOKEN(T_GTE);
   } else {
     ungetc(c, ctx->input);
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    return MAKE_TOKEN_MISC(T_GT);
+    return MAKE_TOKEN(T_GT);
   }
 }
 
@@ -625,9 +671,67 @@ Token lex_not_equal(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
-    return MAKE_TOKEN_MISC(T_NOT_EQUAL);
+    return MAKE_TOKEN(T_NOT_EQUAL);
   } else {
     return MAKE_TOKEN_ERROR();
+  }
+}
+
+Token lex_main_func(LexerCtx *ctx) {
+  State current_state = S_MAIN_AT;
+  while (1) {
+    int c = fgetc(ctx->input);
+    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+    switch (current_state) {
+    case S_MAIN_AT:
+      if (c == 'm') {
+        current_state = S_MAIN_M;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_MAIN_M:
+      if (c == 'a') {
+        current_state = S_MAIN_A;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_MAIN_A:
+      if (c == 'i') {
+        current_state = S_MAIN_I;
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    case S_MAIN_I:
+      if (c == 'n') {
+        return MAKE_TOKEN(T_FUNC_MAIN);
+      } else {
+        return MAKE_TOKEN_ERROR();
+      }
+      break;
+
+    default:
+      assert(false && "Lex '@main' state machine fell through!");
+      return MAKE_TOKEN_ERROR();
+      break;
+    }
+  }
+}
+
+Token lex_unit(LexerCtx *ctx) {
+  int c = fgetc(ctx->input);
+  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+  if (c == ')') {
+    return MAKE_TOKEN(T_UNIT_LITERAL);
+  } else {
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    return MAKE_TOKEN(T_OPEN_BRACKET);
   }
 }
 
@@ -637,23 +741,19 @@ Token get_next_token(LexerCtx *ctx) {
   c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == EOF) {
-    return MAKE_TOKEN_WHITESPACE(T_EOF);
+    return MAKE_TOKEN(T_EOF);
+  }
+
+  if (c == '\r') { // ignore this character
+    c = fgetc(ctx->input);
   }
 
   /* dopsat stavy z jednotlivých FSM */
-  if (c == ' ') {
-    if (ctx->at_start_of_line) {
-      DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-      ungetc(c, ctx->input);
-      return lex_indents(ctx);
-    }
+  if (c == ' ' || c == '\t') {
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    return lex_white_space(ctx);
   }
-
-  // skip all incomming white space
-  ungetc(c, ctx->input);
-  DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-  c = skip_white_space(ctx);
-  ctx->at_start_of_line = false;
 
   if (c == '_' || isalpha(c)) {
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
@@ -662,16 +762,22 @@ Token get_next_token(LexerCtx *ctx) {
   }
 
   if (c == '\n') {
-    ctx->at_start_of_line = true;
-    return MAKE_TOKEN_WHITESPACE(T_EOL);
+    return MAKE_TOKEN(T_EOL);
   }
 
-  if (c == '0' || isdigit(c) || c == '-') {
+  if (c == '0' || isdigit(c)) {
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     return lex_numbers(ctx);
   }
 
+  if (c == '+') {
+    return MAKE_TOKEN(T_PLUS_SIGN);
+  }
+
+  if (c == '-') {
+    return MAKE_TOKEN(T_MINUS_SIGN);
+  }
   // stringy
   if (c == '"') {
     ungetc(c, ctx->input);
@@ -679,41 +785,45 @@ Token get_next_token(LexerCtx *ctx) {
     return lex_string(ctx);
   }
   if (c == ',') {
-    return MAKE_TOKEN_MISC(T_COMMA);
+    return MAKE_TOKEN(T_COMMA);
   }
   if (c == ':') {
-    return MAKE_TOKEN_MISC(T_DOUBLE_DOT);
+    return MAKE_TOKEN(T_DOUBLE_DOT);
   }
 
   if (c == '*') {
-    return MAKE_TOKEN_MISC(T_MULT_SIGN);
-  }
-
-  if (c == '+') {
-    return MAKE_TOKEN_MISC(T_PLUS_SIGN);
-  }
-
-  if (c == '-') {
-    return MAKE_TOKEN_MISC(T_MINUS_SIGN);
+    return MAKE_TOKEN(T_MULT_SIGN);
   }
 
   if (c == '/') {
-    // return lex_div_com(ctx);
-    // TO DO DO Dodělat ty opice
+    return lex_div_com(ctx);
   }
 
   if (c == '=') {
     return lex_equal(ctx);
   }
   if (c == '>') {
-    return lex_compare_l(ctx);
+    return lex_compare_g(ctx);
   }
   if (c == '<') {
-    return lex_compare_g(ctx);
+    return lex_compare_l(ctx);
   }
 
   if (c == '!') {
     return lex_not_equal(ctx);
+  }
+  if (c == '.') {
+    return MAKE_TOKEN(T_DOT);
+  }
+  if (c == '(') {
+    return lex_unit(ctx);
+  }
+  if (c == ')') {
+    return MAKE_TOKEN(T_CLOSE_BRACKET);
+  }
+
+  if (c == '@') {
+    return lex_main_func(ctx);
   }
 
   return MAKE_TOKEN_ERROR();
@@ -745,10 +855,6 @@ static const char *token_to_string_table[] = {
     [T_MULT_SIGN] = "T_MULT_SIGN",
     [T_OPEN_BRACKET] = "T_OPEN_BRACKET",
     [T_CLOSE_BRACKET] = "T_CLOSE_BRACKET",
-    [T_OPEN_PAREN] = "T_OPEN_PAREN",
-    [T_CLOSE_PAREN] = "T_CLOSE_PAREN",
-    [T_OPEN_CURLY_BRACES] = "T_OPEN_CURLY_BRACES",
-    [T_CLOSE_CURLY_BRACES] = "T_CLOSE_CURLY_BRACES",
     [T_COMMA] = "T_COMMA",
     [T_EQUAL] = "T_EQUAL",
     [T_ASSIGN] = "T_ASSIGN",
@@ -757,13 +863,79 @@ static const char *token_to_string_table[] = {
     [T_LTE] = "T_LTE",
     [T_GT] = "T_GT",
     [T_GTE] = "T_GTE",
-    [T_FUNCTION] = "T_FUNCTION",
     [T_INDENTS] = "T_INDENTS",
     [T_ERROR] = "T_ERROR",
     [T_EOF] = "T_EOF",
     [T_EOL] = "T_EOL",
+    [T_DOUBLE_DOT] = "T_DOUBLE_DOT",
+    [T_WHITESPACE_SEP] = "T_WHITESPACE_SEP",
+    [T_FUNC_MAIN] = "T_FUNC_MAIN",
+    [T_DOT] = "T_DOT",
+    [T_UNIT_LITERAL] = "T_UNIT_LITERAL",
+
 };
 
-const char *token_to_string(TokenType token) {
+const char *token_type_to_string(TokenType token) {
   return token_to_string_table[token];
+}
+
+void print_token(const Token *token) {
+  const char *token_type_str = token_type_to_string(token->token_type);
+  switch (token->token_type) {
+  case T_INT_LITERAL:
+  case T_DOUBLE_LITERAL:
+  case T_STRING_LITERAL:
+  case T_IDENTIFICATOR:
+    printf("Token {type = %s, data = \"%s\"}", token_type_str,
+           token->token_lexeme.lexeme);
+    break;
+  case T_KW_DEF:
+  case T_KW_DO:
+  case T_KW_DOUBLE:
+  case T_KW_ELSE:
+  case T_KW_IF:
+  case T_KW_IMPORT:
+  case T_KW_INT:
+  case T_KW_RETURN:
+  case T_KW_STRING:
+  case T_KW_THEN:
+  case T_KW_UNIT:
+  case T_KW_VAL:
+  case T_KW_VAR:
+  case T_KW_WHILE:
+  case T_NOT_EQUAL:
+  case T_PLUS_SIGN:
+  case T_MINUS_SIGN:
+  case T_MULT_SIGN:
+  case T_OPEN_BRACKET:
+  case T_CLOSE_BRACKET:
+  case T_COMMA:
+  case T_EQUAL:
+  case T_ASSIGN:
+  case T_DIVIDE:
+  case T_LT:
+  case T_LTE:
+  case T_GT:
+  case T_GTE:
+    printf("Token {type = %s}", token_type_str);
+    break;
+  case T_INDENTS:
+    printf("Token {type = %s, indents = %d}", token_type_str,
+           token->token_indents.count);
+    break;
+  case T_ERROR:
+  case T_EOF:
+  case T_EOL:
+  case T_DOUBLE_DOT:
+  case T_WHITESPACE_SEP:
+  case T_FUNC_MAIN:
+  case T_DOT:
+  case T_UNIT_LITERAL:
+    printf("Token {type = %s}", token_type_str);
+    break;
+  default:
+    // should never happen!!
+    assert(false && "print_token fell thourgh!!");
+    break;
+  }
 }

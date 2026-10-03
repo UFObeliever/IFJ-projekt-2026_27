@@ -9,4 +9,4 @@ sure*/that working*/ ggagagag
 
 /*aaddaadasasasa
 */ aasssds
-var a = /*nice /*number*/*/ 69
+var a = /*nice /*number*/*/	     69
