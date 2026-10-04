@@ -816,10 +816,10 @@ Token get_next_token(LexerCtx *ctx) {
     return MAKE_TOKEN(T_DOT);
   }
   if (c == '(') {
-    return lex_unit(ctx);
+    return MAKE_TOKEN(T_OPEN_BRACKET);
   }
-  if (c == ')') {
-    return MAKE_TOKEN(T_CLOSE_BRACKET);
+  if (c == ';') {
+    return MAKE_TOKEN(T_SEMICOLON);
   }
 
   if (c == '@') {

@@ -50,6 +50,7 @@ typedef enum TokenType {
   T_FUNC_MAIN,
   T_DOT,
   T_UNIT_LITERAL,
+  T_SEMICOLON,
 } TokenType;
 
 typedef enum State {
