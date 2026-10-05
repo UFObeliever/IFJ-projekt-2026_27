@@ -1,0 +1,15 @@
+""
+
+"Ahoj svete"
+
+"Vsechny esc: \\ \" \n \r \t"
+
+""""""
+
+"""Prvni radek
+Druhy radek"""
+
+"""Radek s \"\"\" uvozovkami"""
+
+"""Escapy v multiline: 
+\n\t\\"""

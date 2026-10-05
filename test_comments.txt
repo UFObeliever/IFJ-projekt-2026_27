@@ -1,0 +1,12 @@
+// Toto je obycajny komentar
+/*hmmmmmm*/
+/*hmm you 
+sure that*/
+/*rly/*you
+sure*/that working*/ ggagagag
+// aaaah
+/*hmmmmmmmmmmmmmm*/
+
+/*aaddaadasasasa
+*/ aasssds
+var a = /*nice /*number*/*/	     69

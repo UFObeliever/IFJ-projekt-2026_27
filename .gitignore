@@ -5,6 +5,7 @@
 *.out
 ifj26
 compiler
+compiler-debug
 
 # Archivy
 *.zip
