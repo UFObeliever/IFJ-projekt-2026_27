@@ -18,6 +18,7 @@ compiler-debug
 .idea/
 *.swp
 /build
+LL_grammar.txt
 
 # OS balast
 .DS_Store
