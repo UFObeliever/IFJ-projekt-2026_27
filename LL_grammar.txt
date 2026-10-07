@@ -1,0 +1,53 @@
+MainFunction -> 
+    "@main" "def" ID "(" ")" ":" "Unit" "=" FunctionBody
+
+ValDef -> 
+    "val" ID ( ":" Type )? "=" ( Expression | Call )
+
+VarDef -> 
+    "var" ID ( ":" Type )? "=" ( Expression | Call )
+
+IfStatement -> 
+    "if" Expression "then" Block "else" Block
+
+WhileStatement -> 
+    "while" Expression "do" Block
+
+Defsingle ->
+    "def" ID"(" Parameters ")" (":" ReturnType )? "=" ( Expression | Call )
+
+DefMulti ->
+    "def" ID"(" Parameters ")" (":" ReturnType )? "=" Block
+
+Parameter ->
+    ID ":" Type
+
+Parameters -> 
+    Parameter ( "," Parameter )* | empty
+
+Block -> 
+    EOL INDENT StatementList DEDENT
+
+StatementList -> 
+    Statement ( ( EOL | ";" ) Statement )*
+
+Type ->
+    Int | Double | String | Unit
+
+Assignment ->
+    ID "=" ( Expression | Call )
+
+Return ->
+    "return" ( Expression | Call )?
+
+Program -> 
+    Prolog FunctionList EOF
+
+Prolog -> 
+    "import" "ifj26" "." "*"
+
+FunctionList -> 
+    ( DefSingle | DefMulti | MainFunction )*
+
+Statement -> 
+    ValDef | VarDef | Assignment | IfStatement | WhileStatement | Return | Call | Expression

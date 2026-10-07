@@ -6,3 +6,6 @@ typedef struct ParserCtx {
 } ParserCtx;
 
 int parse_program(LexerCtx *lexer);
+int parse_function_list(ParserCtx *ctx);
+int parse_function_definition(ParserCtx *ctx);
+int parse_function_body(ParserCtx *ctx);
