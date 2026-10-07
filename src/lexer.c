@@ -4,8 +4,8 @@
 /**
  * @brief Makro na vytvoření tokenu lexémy
  *
- * @param TYPE: typ tokenu
- * @param LEXEME: lexem na uložení
+ * @param TYPE: typ_tokenu
+ * @param LEXEME: lexem_na_uložení
  */
 #define MAKE_TOKEN_LEXEME(TYPE, LEXEME)                                        \
   (Token) {                                                                    \
@@ -23,8 +23,8 @@
 /**
  * @brief Makro na vytvoření tokenu odsadzení
  *
- * @param TYPE: typ tokenu
- * @param COUNT: počet odsadzení
+ * @param TYPE: typ_tokenu
+ * @param COUNT: počet_odsadzení
  *
  */
 #define MAKE_TOKEN_INDENTS(COUNT)                                              \
