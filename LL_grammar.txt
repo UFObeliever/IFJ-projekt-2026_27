@@ -1,3 +1,9 @@
+Program -> 
+    Prolog FunctionList EOF
+
+Prolog -> 
+    "import" "ifj26" "." "*"
+
 MainFunction -> 
     "@main" "def" ID "(" ")" ":" "Unit" "=" FunctionBody
 
@@ -39,12 +45,6 @@ Assignment ->
 
 Return ->
     "return" ( Expression | Call )?
-
-Program -> 
-    Prolog FunctionList EOF
-
-Prolog -> 
-    "import" "ifj26" "." "*"
 
 FunctionList -> 
     ( DefSingle | DefMulti | MainFunction )*

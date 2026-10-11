@@ -1,11 +1,23 @@
+#ifndef PARSER_H
+#define PARSER_H
+
 #include "lexer.h"
+#include "symtable.h"
+
+typedef struct {
+  TokenType items[256];
+  int top;
+} PrecedenceStack;
 
 typedef struct ParserCtx {
   Token current_token;
   LexerCtx *lexer;
+  symtable smt;
+  PrecedenceStack stack;
 } ParserCtx;
 
-int parse_program(LexerCtx *lexer);
-int parse_function_list(ParserCtx *ctx);
-int parse_function_definition(ParserCtx *ctx);
-int parse_function_body(ParserCtx *ctx);
+Token look_next_eol(ParserCtx *parser);
+Token consume_token(ParserCtx *parser);
+int parse_program(ParserCtx *ctx);
+
+#endif
