@@ -87,9 +87,11 @@ ASTNode *ast_create_node(ASTNodeType type);
 void ast_free(ASTNode *node);
 
 ASTNode *ast_make_int(int value);
+ASTNode *ast_make_double(double value);
 ASTNode *ast_make_string(char *value);
 ASTNode *ast_make_binop(int operator_type, ASTNode *left, ASTNode *right);
 ASTNode *ast_make_if(ASTNode *condition, ASTNode *body, ASTNode *else_body);
 ASTNode *ast_make_while(ASTNode *condition, ASTNode *body);
+ASTNode *ast_make_unary(int operator_type, ASTNode *operand);
 
 #endif

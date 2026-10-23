@@ -68,10 +68,26 @@ static bool stack_pop(PrecedenceStack *s) {
 static ExprType expr_type_from_token(TokenType t) {
   switch (t) {
   case T_INT_LITERAL:
+    return EXPR_TYPE_INT;
   case T_DOUBLE_LITERAL:
-    return EXPR_TYPE_NUM;
+    return EXPR_TYPE_DOUBLE;
   case T_STRING_LITERAL:
     return EXPR_TYPE_STRING;
+  default:
+    return EXPR_TYPE_UNKNOWN;
+  }
+}
+
+static ExprType expr_type_from_kw(TokenType t) {
+  switch (t) {
+  case T_KW_INT:
+    return EXPR_TYPE_INT;
+  case T_KW_DOUBLE:
+    return EXPR_TYPE_DOUBLE;
+  case T_KW_STRING:
+    return EXPR_TYPE_STRING;
+  case T_KW_UNIT:
+    return EXPR_TYPE_UNIT;
   default:
     return EXPR_TYPE_UNKNOWN;
   }
@@ -148,23 +164,19 @@ static const PrecedenceAction precedence_table[EX_COUNT][EX_COUNT] = {
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR, PREC_ERROR, PREC_ERROR}};
 
-static Error check_identifier_in_expr(ParserCtx *parser, const Token *token) {
+static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
+                                      ExprType *type) {
   symtable_entry *entry = NULL;
 
-  if (smt_search(&parser->smt, (char *)token->token_lexeme.lexeme, &entry)) {
-    if (!entry->function) {
-      return SUCCESS;
-    }
+  if (!smt_search(&parser->smt, (char *)token->token_lexeme.lexeme, &entry)) {
+    return UNDEF_FN_ERR;
+  }
+  if (entry->function) {
     return STATIC_SEM_TYPE_ERR;
   }
 
-  symtable_entry *head = NULL;
-  if (smt_search_global(&parser->smt, (char *)token->token_lexeme.lexeme,
-                        &head)) {
-    return STATIC_SEM_TYPE_ERR;
-  }
-
-  return UNDEF_FN_ERR;
+  *type = expr_type_from_kw(entry->type);
+  return SUCCESS;
 }
 
 ExprColumn token_to_column(TokenType t) {
@@ -253,6 +265,20 @@ static bool is_operator_token(TokenType t) {
   }
 }
 
+static bool is_numeric(ExprType t) {
+  return t == EXPR_TYPE_INT || t == EXPR_TYPE_DOUBLE;
+}
+
+static ExprType int_or_double(ExprType l, ExprType r) {
+  if (l == EXPR_TYPE_DOUBLE) {
+    return EXPR_TYPE_DOUBLE;
+  }
+  if (r == EXPR_TYPE_DOUBLE) {
+    return EXPR_TYPE_DOUBLE;
+  }
+  return EXPR_TYPE_INT;
+}
+
 Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   ExprType right_type, left_type;
   ASTNode *right_node, *left_node;
@@ -267,39 +293,47 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
 
   ExprType result = EXPR_TYPE_UNKNOWN;
 
+  bool known =
+      left_type != EXPR_TYPE_UNKNOWN && right_type != EXPR_TYPE_UNKNOWN;
+
   switch (op) {
   case T_PLUS_SIGN:
-    if (left_type == EXPR_TYPE_NUM && right_type == EXPR_TYPE_NUM)
-      result = EXPR_TYPE_NUM;
+    if (is_numeric(left_type) && is_numeric(right_type))
+      result = int_or_double(left_type, right_type);
     else if (left_type == EXPR_TYPE_STRING && right_type == EXPR_TYPE_STRING)
       result = EXPR_TYPE_STRING;
-    else if (left_type != EXPR_TYPE_UNKNOWN && right_type != EXPR_TYPE_UNKNOWN)
+    else if (known)
       return STATIC_SEM_TYPE_ERR;
     break;
   case T_MINUS_SIGN:
   case T_MULT_SIGN:
   case T_DIVIDE:
-    if (op == T_MULT_SIGN && left_type == EXPR_TYPE_STRING &&
-        right_type == EXPR_TYPE_NUM)
-      result = EXPR_TYPE_STRING;
-    else if (left_type == EXPR_TYPE_NUM && right_type == EXPR_TYPE_NUM)
-      result = EXPR_TYPE_NUM;
-    else if (left_type != EXPR_TYPE_UNKNOWN && right_type != EXPR_TYPE_UNKNOWN)
+    if (is_numeric(left_type) && is_numeric(right_type))
+      result = int_or_double(left_type, right_type);
+    else if (known)
       return STATIC_SEM_TYPE_ERR;
     break;
   case T_LT:
   case T_LTE:
   case T_GT:
   case T_GTE:
-    if (left_type != EXPR_TYPE_UNKNOWN && right_type != EXPR_TYPE_UNKNOWN) {
-      if (left_type != EXPR_TYPE_NUM || right_type != EXPR_TYPE_NUM)
+    if (known) {
+      bool both_num = is_numeric(left_type) && is_numeric(right_type);
+      bool both_str =
+          left_type == EXPR_TYPE_STRING && right_type == EXPR_TYPE_STRING;
+      if (!both_num && !both_str)
         return STATIC_SEM_TYPE_ERR;
     }
-    result = EXPR_TYPE_NUM;
+    result = EXPR_TYPE_BOOL;
     break;
   case T_EQUAL:
   case T_NOT_EQUAL:
-    result = EXPR_TYPE_NUM;
+    if (known) {
+      bool both_num = is_numeric(left_type) && is_numeric(right_type);
+      if (!both_num && left_type != right_type)
+        return STATIC_SEM_TYPE_ERR;
+    }
+    result = EXPR_TYPE_BOOL;
     break;
   default:
     result = EXPR_TYPE_UNKNOWN;
@@ -357,8 +391,10 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
 
     if (is_operand_token(lookahead.token_type) && expect_operand) {
       ASTNode *leaf = NULL;
+      ExprType t = expr_type_from_token(lookahead.token_type);
+
       if (lookahead.token_type == T_IDENTIFICATOR) {
-        Error err = check_identifier_in_expr(parser, &lookahead);
+        Error err = check_identifier_in_expr(parser, &lookahead, &t);
         if (err != SUCCESS)
           return err;
 
@@ -372,7 +408,6 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
 
-      ExprType t = expr_type_from_token(lookahead.token_type);
       if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }

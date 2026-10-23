@@ -9,6 +9,7 @@
 #include <string.h>
 
 typedef struct f_param {
+  TokenType type;
   char *name;
 } f_param;
 
@@ -17,6 +18,8 @@ typedef struct symtable_entry {
   bool declared;
   bool defined;
   bool function;
+  bool variable;
+  bool value;
   int f_param_count;
   f_param *f_params;
 } symtable_entry;

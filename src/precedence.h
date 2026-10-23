@@ -10,9 +10,12 @@
 
 typedef enum ExprType {
   EXPR_TYPE_UNKNOWN,
-  EXPR_TYPE_NUM,
+  EXPR_TYPE_INT,
+  EXPR_TYPE_DOUBLE,
   EXPR_TYPE_STRING,
-  EXPR_TYPE_NULL
+  EXPR_TYPE_UNIT,
+  EXPR_TYPE_NULL,
+  EXPR_TYPE_BOOL
 } ExprType;
 
 typedef enum PrecedenceAction {
