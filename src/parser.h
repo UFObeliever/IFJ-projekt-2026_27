@@ -14,6 +14,8 @@ typedef struct ParserCtx {
   LexerCtx *lexer;
   symtable smt;
   PrecedenceStack stack;
+  TokenType ret_type;
+  int main_count;
 } ParserCtx;
 
 Token look_next_eol(ParserCtx *parser);

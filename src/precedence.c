@@ -259,6 +259,7 @@ static bool is_operator_token(TokenType t) {
   case T_LT:
   case T_LTE:
   case T_GT:
+  case T_GTE:
     return true;
   default:
     return false;
@@ -441,7 +442,8 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
       expect_operand = false;
     } else if (is_operator_token(lookahead.token_type) && !expect_operand) {
       TokenType next = lookahead.token_type;
-      while (true) {
+      bool pushed = false;
+      while (!pushed) {
         TokenType top = top_terminal(&parser->stack);
         if (top == T_EOF) {
           stack_push(&parser->stack, next);
@@ -462,7 +464,8 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
           stack_push(&parser->stack, next);
           consume_token(parser);
           expect_operand = true;
-          return SUCCESS;
+          pushed = true;
+          break;
         case PREC_REDUCE: {
           stack_pop(&parser->stack);
           if (!is_operator_token(top))
@@ -481,7 +484,9 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
         }
       }
     } else {
-      return SYN_ANAL_ERR;
+      if (expect_operand)
+        return SYN_ANAL_ERR;
+      break;
     }
     lookahead = look_next_eol(parser);
   }

@@ -9,6 +9,8 @@ int main(void) {
   parser.lexer = &lexer_ctx;
   smt_init(&parser.smt);
   parser.stack.top = -1;
+  parser.ret_type = T_ERROR;
+  parser.main_count = 0;
 
   int result = parse_program(&parser);
 
