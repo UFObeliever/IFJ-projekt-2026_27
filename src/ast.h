@@ -19,7 +19,8 @@ typedef enum {
   AST_LITERAL_INT,
   AST_LITERAL_FLOAT,
   AST_LITERAL_STRING,
-  AST_LITERAL_NULL
+  AST_LITERAL_NULL,
+  AST_LITERAL_UNIT
 } ASTNodeType;
 
 typedef struct ASTNode {

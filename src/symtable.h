@@ -41,7 +41,7 @@ typedef struct symtable {
 symtable_entry *symtable_entry_init(void);
 void symtable_entry_dispose(symtable_entry *entry);
 
-int max(int a, int b);
+int maxInt(int a, int b);
 int avl_height(avl_tree *tree);
 int node_balance(avl_tree *tree);
 
@@ -61,5 +61,6 @@ bool smt_search_global(symtable *smt, char *key, symtable_entry **entry);
 void smt_insert(symtable *smt, char *key, symtable_entry *entry);
 void smt_insert_global(symtable *smt, char *key, symtable_entry *entry);
 void smt_dispose(symtable *smt);
+void smt_insert_builtin_funcs(symtable *smt);
 
 #endif

@@ -1,0 +1,8 @@
+import ifj26.*
+
+@main def main(): Unit = 
+    Double y = 3.1
+    Double x = 3.
+    Int z = 0x10
+    print(x)
+    `x`

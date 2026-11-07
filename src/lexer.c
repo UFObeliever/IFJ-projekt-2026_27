@@ -62,6 +62,16 @@
     return MAKE_TOKEN_KW(TYPE);                                                \
   }
 
+/**
+ * @brief Makro na vytvoření tokenu tabulátoru
+ *
+ * @param TYPE: typ tokenu
+ * @param COUNT: počet odsadzení
+ *
+ */
+#define MAKE_TOKEN_TAB()                                                       \
+  (Token) { .token_type = (T_TAB) }
+
 #ifdef NDEBUG
 #define DEBUG_LOG(fmt, ...) ((void)0)
 #else
@@ -236,10 +246,14 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'e' || c == 'E') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_E;
+      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       } else {
+        // Toto tedy špatně?? -> spíš pořešit, že pokud je další mezera, tak
+        // make token INT, jinak err
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
+        return MAKE_TOKEN_ERROR();
       }
       break;
 
@@ -256,10 +270,14 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'e' || c == 'E') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_E;
+      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       } else {
+        // Toto tedy špatně?? -> spíš pořešit, že pokud je další mezera, tak
+        // make token INT, jinak err
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
+        return MAKE_TOKEN_ERROR();
       }
       break;
 
@@ -317,6 +335,7 @@ Token lex_numbers(LexerCtx *ctx) {
       if (isdigit(c)) {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_AFTER_E;
+        // může být po 3.1e2 d na konci??? pokud jo, tak dodělat
       } else {
         return MAKE_TOKEN_ERROR();
       }
@@ -331,10 +350,12 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'd' || c == 'D') {
         sb_append_char(&ctx->Buffer, input_char);
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
       } else {
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+        return MAKE_TOKEN_ERROR();
       }
       break;
     default:
@@ -741,10 +762,17 @@ Token get_next_token(LexerCtx *ctx) {
   }
 
   /* dopsat stavy z jednotlivých FSM */
-  if (c == ' ' || c == '\t') {
+  if (c == ' ' /*|| c == '\t'*/) {
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     return lex_white_space(ctx);
+  }
+
+  if (c == '\t') {
+    while (c == '\t') {
+      continue;
+    }
+    return MAKE_TOKEN_TAB();
   }
 
   if (c == '_' || isalpha(c)) {
@@ -868,6 +896,7 @@ static const char *token_to_string_table[] = {
     [T_DOT] = "T_DOT",
     [T_SEMICOLON] = "T_SEMICOLON",
     [T_KW_IFJ26] = "T_KW_IFJ26",
+    [T_TAB] = "T_TAB",
 };
 
 const char *token_type_to_string(TokenType token) {
@@ -926,6 +955,7 @@ void print_token(const Token *token) {
   case T_FUNC_MAIN:
   case T_DOT:
   case T_KW_IFJ26:
+  case T_TAB:
     printf("Token {type = %s}", token_type_str);
     break;
   default:

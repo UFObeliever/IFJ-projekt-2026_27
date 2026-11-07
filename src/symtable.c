@@ -27,7 +27,7 @@ void symtable_entry_dispose(symtable_entry *entry) {
   }
 }
 
-int max(int a, int b) { return (a > b) ? a : b; }
+int maxInt(int a, int b) { return (a > b) ? a : b; }
 
 int avl_height(avl_tree *tree) {
   if (tree == NULL) {
@@ -85,7 +85,7 @@ void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data) {
     avl_insert(&(*tree)->right, key, data);
   }
   (*tree)->height =
-      1 + max(avl_height((*tree)->left), avl_height((*tree)->right));
+      1 + maxInt(avl_height((*tree)->left), avl_height((*tree)->right));
   *tree = balance(*tree);
 }
 
@@ -105,8 +105,8 @@ avl_tree *rotate_right(avl_tree *tree) {
   avl_tree *tmp = tree->left;
   tree->left = tmp->right;
   tmp->right = tree;
-  tree->height = 1 + max(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + max(avl_height(tmp->left), avl_height(tmp->right));
+  tree->height = 1 + maxInt(avl_height(tree->left), avl_height(tree->right));
+  tmp->height = 1 + maxInt(avl_height(tmp->left), avl_height(tmp->right));
   return tmp;
 }
 
@@ -114,8 +114,8 @@ avl_tree *rotate_left(avl_tree *tree) {
   avl_tree *tmp = tree->right;
   tree->right = tmp->left;
   tmp->left = tree;
-  tree->height = 1 + max(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + max(avl_height(tmp->left), avl_height(tmp->right));
+  tree->height = 1 + maxInt(avl_height(tree->left), avl_height(tree->right));
+  tmp->height = 1 + maxInt(avl_height(tmp->left), avl_height(tmp->right));
   return tmp;
 }
 
@@ -146,6 +146,7 @@ void smt_init(symtable *smt) {
     }
     smt->top = -1;
     smt_scope_add(smt);
+    smt_insert_builtin_funcs(smt);
   }
 }
 
@@ -233,4 +234,163 @@ void smt_dispose(symtable *smt) {
     smt->top = -1;
     smt->size = 0;
   }
+}
+
+void smt_insert_builtin_funcs(symtable *smt) {
+  if (smt == NULL) {
+    return;
+  }
+  // print
+  symtable_entry *entry = symtable_entry_init();
+  f_param *func_params = malloc(sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("value")};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_UNIT;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "print", entry);
+
+  // readLine
+  entry = symtable_entry_init();
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_STRING;
+  entry->f_param_count = 0;
+  entry->f_params = NULL;
+  smt_insert_global(smt, "readLine", entry);
+
+  // readInt
+  entry = symtable_entry_init();
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_INT;
+  entry->f_param_count = 0;
+  entry->f_params = NULL;
+  smt_insert_global(smt, "readInt", entry);
+
+  //  readDouble
+  entry = symtable_entry_init();
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_DOUBLE;
+  entry->f_param_count = 0;
+  entry->f_params = NULL;
+  smt_insert_global(smt, "readDouble", entry);
+
+  // toStr
+  entry = symtable_entry_init();
+  func_params = malloc(sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("value")};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_STRING;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "toStr", entry);
+
+  // toInt
+  entry = symtable_entry_init();
+  func_params = malloc(sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_INT};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_INT;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "toInt", entry);
+
+  // strLength
+  entry = symtable_entry_init();
+  func_params = malloc(sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_INT;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "strLength", entry);
+
+  // subStr
+  entry = symtable_entry_init();
+  func_params = malloc(3 * sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
+  func_params[1] = (f_param){.name = strdup("start"), .type = T_KW_INT};
+  func_params[2] = (f_param){.name = strdup("end"), .type = T_KW_INT};
+
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_STRING;
+  entry->f_param_count = 3;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "subStr", entry);
+
+  // ord
+  entry = symtable_entry_init();
+  func_params = malloc(2 * sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
+  func_params[1] = (f_param){.name = strdup("index"), .type = T_KW_INT};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_INT;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "ord", entry);
+
+  // chr
+  entry = symtable_entry_init();
+  func_params = malloc(sizeof(f_param));
+  if (func_params == NULL) {
+    free(entry);
+    smt_dispose(smt);
+    exit(COMPILER_ERR);
+  }
+  func_params[0] = (f_param){.name = strdup("code"), .type = T_KW_INT};
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_KW_STRING;
+  entry->f_param_count = 1;
+  entry->f_params = func_params;
+  smt_insert_global(smt, "chr", entry);
 }
