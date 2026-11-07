@@ -21,19 +21,36 @@ static int parse_return_statement(ParserCtx *ctx);
 static int parse_block(ParserCtx *ctx, int current_indent);
 
 static void advance(ParserCtx *ctx) {
-  Token tok = get_next_token(ctx->lexer);
-  while (tok.token_type == T_WHITESPACE_SEP) {
-    tok = get_next_token(ctx->lexer);
+  ctx->current_token = get_next_token(ctx->lexer);
+  while (ctx->current_token.token_type == T_WHITESPACE_SEP ||
+         ctx->current_token.token_type == T_INDENTS) {
+    ctx->current_token = get_next_token(ctx->lexer);
   }
-  ctx->current_token = tok;
+}
+
+static void advance_(ParserCtx *ctx) {
+  ctx->current_token = get_next_token(ctx->lexer);
+  while (ctx->current_token.token_type == T_WHITESPACE_SEP) {
+    ctx->current_token = get_next_token(ctx->lexer);
+  }
 }
 
 static int match(ParserCtx *ctx, TokenType expected) {
   if (ctx->current_token.token_type == expected) {
-    if (expected != T_EOF) {
+    fprintf(stderr, "match: token %d does match expected %d\n",
+            ctx->current_token.token_type, expected);
+    if (expected == T_EOL) {
+      advance_(ctx);
+    } else if (expected != T_EOF) {
       advance(ctx);
     }
     return 0;
+  }
+
+  fprintf(stderr, "match error: token %d does not match expected %d\n",
+          ctx->current_token.token_type, expected);
+  if (ctx->current_token.token_type == T_ERROR) {
+    return 1;
   }
   return ERR_SYNTAX;
 }
@@ -61,13 +78,23 @@ int parse_program(ParserCtx *ctx) {
 
 static int parse_prolog(ParserCtx *ctx) {
   int status;
+  while (ctx->current_token.token_type == T_EOL ||
+         ctx->current_token.token_type == T_WHITESPACE_SEP ||
+         ctx->current_token.token_type == T_INDENTS) {
+    advance(ctx);
+  }
+
   if ((status = match(ctx, T_KW_IMPORT)) != 0)
     return status;
-  if ((status = match(ctx, T_IDENTIFICATOR)) != 0)
+
+  if ((status = match(ctx, T_KW_IFJ26)) != 0)
     return status;
+
   if ((status = match(ctx, T_DOT)) != 0)
     return status;
-  return match(ctx, T_MULT_SIGN);
+  if ((status = match(ctx, T_MULT_SIGN)))
+    return status;
+  return match(ctx, T_EOL);
 }
 
 static int parse_function_list(ParserCtx *ctx) {
@@ -87,7 +114,8 @@ static int parse_function_list(ParserCtx *ctx) {
       return status;
     return parse_function_list(ctx);
   }
-
+  fprintf(stderr, "parse_function_list error: token %d shit happens",
+          ctx->current_token.token_type);
   return ERR_SYNTAX;
 }
 
@@ -101,6 +129,7 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
     advance(ctx);
     return 0;
   default:
+    fprintf(stderr, "error: unknown type was returned!!");
     return ERR_SYNTAX;
   }
 }
@@ -110,18 +139,24 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   *params = NULL;
   *count = 0;
 
-  if (ctx->current_token.token_type == T_UNIT_LITERAL) {
-    advance(ctx);
-    return 0;
-  }
   if ((status = match(ctx, T_OPEN_BRACKET)) != 0)
     return status;
   if (ctx->current_token.token_type == T_CLOSE_BRACKET)
     return match(ctx, T_CLOSE_BRACKET);
 
   while (true) {
-    if (ctx->current_token.token_type != T_IDENTIFICATOR)
+    if (ctx->current_token.token_type == T_EOL) {
+      advance(ctx);
+    }
+    if (ctx->current_token.token_type != T_IDENTIFICATOR &&
+        ctx->current_token.token_type != T_CLOSE_BRACKET)
       return ERR_SYNTAX;
+    // stop parsing parameters everything is OK
+    if (ctx->current_token.token_type == T_CLOSE_BRACKET) {
+      fprintf(stderr, "returning found )\n");
+      advance(ctx);
+      return 0;
+    }
     const char *pname = ctx->current_token.token_lexeme.lexeme;
     for (int i = 0; i < *count; i++) {
       if (strcmp((*params)[i].name, pname) == 0)
@@ -149,6 +184,9 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
     }
     break;
   }
+  if (ctx->current_token.token_type == T_EOL) {
+    advance(ctx);
+  }
   return match(ctx, T_CLOSE_BRACKET);
 }
 
@@ -159,6 +197,10 @@ static int parse_defsingle(ParserCtx *ctx) {
   if (ctx->current_token.token_type == T_FUNC_MAIN) {
     is_main = true;
     advance(ctx);
+    // optional T_EOL before def
+    if (ctx->current_token.token_type == T_EOL) {
+      advance(ctx);
+    }
     if (match(ctx, T_KW_DEF) != 0)
       return ERR_SYNTAX;
   } else if (ctx->current_token.token_type == T_KW_DEF) {
@@ -522,9 +564,9 @@ static int parse_block(ParserCtx *ctx, int expected_indent) {
 
   if ((status = match(ctx, T_EOL)) != 0)
     return status;
-
   if (ctx->current_token.token_type != T_INDENTS)
     return ERR_SYNTAX;
+
   if (ctx->current_token.token_indents.count <= expected_indent)
     return ERR_SYNTAX;
 

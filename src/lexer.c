@@ -96,6 +96,7 @@ Token keyword_check(const LexerCtx *ctx) {
   T_KW_VAL,
   T_KW_VAR,
   T_KW_WHILE,
+  T_KW_IFJ26
   */
   KEYWORD_CHECK(T_KW_DEF, "def");
   KEYWORD_CHECK(T_KW_DO, "do");
@@ -111,6 +112,7 @@ Token keyword_check(const LexerCtx *ctx) {
   KEYWORD_CHECK(T_KW_VAL, "val");
   KEYWORD_CHECK(T_KW_VAR, "var");
   KEYWORD_CHECK(T_KW_WHILE, "while");
+  KEYWORD_CHECK(T_KW_IFJ26, "ifj26");
 
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
 }
@@ -143,6 +145,8 @@ Token lex_white_space(LexerCtx *ctx) {
       } else if (c == EOF) {
         return MAKE_TOKEN(T_EOF);
       } else {
+        ungetc(c, ctx->input);
+        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN(T_WHITESPACE_SEP);
       }
       break;
@@ -723,18 +727,6 @@ Token lex_main_func(LexerCtx *ctx) {
   }
 }
 
-Token lex_unit(LexerCtx *ctx) {
-  int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
-  if (c == ')') {
-    return MAKE_TOKEN(T_UNIT_LITERAL);
-  } else {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    ungetc(c, ctx->input);
-    return MAKE_TOKEN(T_OPEN_BRACKET);
-  }
-}
-
 Token get_next_token(LexerCtx *ctx) {
   int c;
   sb_reset(&ctx->Buffer);
@@ -818,6 +810,9 @@ Token get_next_token(LexerCtx *ctx) {
   if (c == '(') {
     return MAKE_TOKEN(T_OPEN_BRACKET);
   }
+  if (c == ')') {
+    return MAKE_TOKEN(T_CLOSE_BRACKET);
+  }
   if (c == ';') {
     return MAKE_TOKEN(T_SEMICOLON);
   }
@@ -871,8 +866,8 @@ static const char *token_to_string_table[] = {
     [T_WHITESPACE_SEP] = "T_WHITESPACE_SEP",
     [T_FUNC_MAIN] = "T_FUNC_MAIN",
     [T_DOT] = "T_DOT",
-    [T_UNIT_LITERAL] = "T_UNIT_LITERAL",
-
+    [T_SEMICOLON] = "T_SEMICOLON",
+    [T_KW_IFJ26] = "T_KW_IFJ26",
 };
 
 const char *token_type_to_string(TokenType token) {
@@ -930,7 +925,7 @@ void print_token(const Token *token) {
   case T_WHITESPACE_SEP:
   case T_FUNC_MAIN:
   case T_DOT:
-  case T_UNIT_LITERAL:
+  case T_KW_IFJ26:
     printf("Token {type = %s}", token_type_str);
     break;
   default:

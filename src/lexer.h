@@ -49,8 +49,8 @@ typedef enum TokenType {
   T_WHITESPACE_SEP,
   T_FUNC_MAIN,
   T_DOT,
-  T_UNIT_LITERAL,
   T_SEMICOLON,
+  T_KW_IFJ26,
 } TokenType;
 
 typedef enum State {
