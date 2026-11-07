@@ -57,7 +57,13 @@ tidy-fix:
 docs :
 	doxygen
 
-.PHONY: all clean  dir_build  docs format tidy-check tidy-fix
+test: debug
+	./tests/run_tests.sh ./$(DEBUG_TARGET)
+
+test-release: all
+	tests/run_tests.sh $(TARGET)
+
+.PHONY: all clean  dir_build  docs format tidy-check tidy-fix test test-release
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)  $(DOCDIR) $(DEBUG_TARGET)

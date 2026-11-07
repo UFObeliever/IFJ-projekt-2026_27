@@ -1,0 +1,9 @@
+import ifj26.*
+
+@main def main(): Unit =
+  var a = 0
+  if a < 1 then
+    val t = 1
+  else
+    val u = 2
+  val x = t
