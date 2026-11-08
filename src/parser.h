@@ -16,10 +16,13 @@ typedef struct ParserCtx {
   PrecedenceStack stack;
   TokenType ret_type;
   int main_count;
+  Token peek;
+  bool has_peek;
 } ParserCtx;
 
 Token look_next_eol(ParserCtx *parser);
 Token consume_token(ParserCtx *parser);
+Token peek_token(ParserCtx *parser);
 int parse_program(ParserCtx *ctx);
 
 #endif

@@ -26,19 +26,27 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent);
 static int parse_return_statement(ParserCtx *ctx);
 static int parse_block(ParserCtx *ctx, int current_indent);
 
+static Token fetch_token(ParserCtx *ctx) {
+  if (ctx->has_peek) {
+    ctx->has_peek = false;
+    return ctx->peek;
+  }
+  return get_next_token(ctx->lexer);
+}
+
 static void advance(ParserCtx *ctx) {
-  ctx->current_token = get_next_token(ctx->lexer);
+  ctx->current_token = fetch_token(ctx);
   while (ctx->current_token.token_type == T_WHITESPACE_SEP ||
          ctx->current_token.token_type == T_INDENTS ||
          ctx->current_token.token_type == T_TAB) {
-    ctx->current_token = get_next_token(ctx->lexer);
+    ctx->current_token = fetch_token(ctx);
   }
 }
 
 static void advance_(ParserCtx *ctx) {
-  ctx->current_token = get_next_token(ctx->lexer);
+  ctx->current_token = fetch_token(ctx);
   while (ctx->current_token.token_type == T_WHITESPACE_SEP) {
-    ctx->current_token = get_next_token(ctx->lexer);
+    ctx->current_token = fetch_token(ctx);
   }
 }
 
@@ -70,7 +78,21 @@ Token consume_token(ParserCtx *parser) {
   return consumed;
 }
 
+Token peek_token(ParserCtx *parser) {
+  if (!parser->has_peek) {
+    Token t = get_next_token(parser->lexer);
+    while (t.token_type == T_WHITESPACE_SEP || t.token_type == T_INDENTS ||
+           t.token_type == T_TAB) {
+      t = get_next_token(parser->lexer);
+    }
+    parser->peek = t;
+    parser->has_peek = true;
+  }
+  return parser->peek;
+}
+
 int parse_program(ParserCtx *ctx) {
+  ctx->has_peek = false;
   advance_(ctx);
   TOKEN_CHEK(ctx->current_token)
   int status;
@@ -318,6 +340,11 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent) {
   return 0;
 }
 
+static int parse_expr_statement(ParserCtx *ctx) {
+  ExprType t = EXPR_TYPE_UNKNOWN;
+  return parse_expression(ctx, NULL, &t);
+}
+
 static int end_of_simple_statement(ParserCtx *ctx, int status) {
   if (status != 0)
     return status;
@@ -341,7 +368,14 @@ static int parse_statement(ParserCtx *ctx, int current_indent) {
   case T_KW_RETURN:
     return end_of_simple_statement(ctx, parse_return_statement(ctx));
   case T_IDENTIFICATOR:
-    return end_of_simple_statement(ctx, parse_assignment(ctx));
+    if (peek_token(ctx).token_type == T_ASSIGN)
+      return end_of_simple_statement(ctx, parse_assignment(ctx));
+    return end_of_simple_statement(ctx, parse_expr_statement(ctx));
+  case T_INT_LITERAL:
+  case T_DOUBLE_LITERAL:
+  case T_STRING_LITERAL:
+  case T_OPEN_BRACKET:
+    return end_of_simple_statement(ctx, parse_expr_statement(ctx));
   default:
     return ERR_SYNTAX;
   }
