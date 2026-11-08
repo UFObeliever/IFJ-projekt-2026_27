@@ -423,19 +423,29 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
 
   if (parser->current_token.token_type == T_ERROR)
     return LEX_ANAL_ERR;
-  if (parser->current_token.token_type != T_CLOSE_BRACKET) {
-    ExprType at = EXPR_TYPE_UNKNOWN;
-    Error err = parse_expression(parser, NULL, &at);
-    if (err != SUCCESS)
-      return err;
-    if (parser->current_token.token_type == T_ERROR)
-      return LEX_ANAL_ERR;
-    if (parser->current_token.token_type == T_COMMA)
-      return STATIC_SEM_TYPE_ERR;
-    if (parser->current_token.token_type != T_CLOSE_BRACKET)
+  if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+    (void)consume_token(parser);
+  } else {
+    while (true) {
+      ExprType at = EXPR_TYPE_UNKNOWN;
+      Error err = parse_expression(parser, NULL, &at);
+      if (err != SUCCESS)
+        return err;
+
+      TokenType t = parser->current_token.token_type;
+      if (t == T_ERROR)
+        return LEX_ANAL_ERR;
+      if (t == T_COMMA) {
+        (void)consume_token(parser);
+        continue;
+      }
+      if (t == T_CLOSE_BRACKET) {
+        (void)consume_token(parser);
+        break;
+      }
       return SYN_ANAL_ERR;
+    }
   }
-  (void)consume_token(parser);
 
   if (fn->type == T_ERROR)
     return STATIC_SEM_TYPE_ERR;
