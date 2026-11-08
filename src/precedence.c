@@ -535,6 +535,7 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
 
   bool expect_operand = true;
   int BRACKET_depth = 0;
+  const int start_indent = parser->line_indent;
 
   Token lookahead = look_next_eol(parser);
 
@@ -549,6 +550,14 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
             "= %d, BRACKET_depth = %d, stack_top = %d\n",
             lookahead.token_type, expect_operand, BRACKET_depth,
             parser->stack.top);
+    if (lookahead.token_type == T_EOL && BRACKET_depth > 0) {
+      CONSUME_TOKEN_GUARD(parser);
+      lookahead = look_next_eol(parser);
+      if (lookahead.token_type != T_EOL && lookahead.token_type != T_EOF &&
+          parser->line_indent <= start_indent)
+        return SYN_ANAL_ERR;
+      continue;
+    }
     bool is_end_token = false;
     switch (lookahead.token_type) {
     case T_EOL:
