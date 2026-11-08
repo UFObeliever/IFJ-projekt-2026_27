@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #define TYPE_STACK_MAX 256
+#define T_UNARY_MINUS_MARK ((TokenType)1000)
 #define CONSUME_TOKEN_GUARD(parser)                                            \
   do {                                                                         \
     Token tok = consume_token((parser));                                       \
@@ -308,6 +309,24 @@ static bool is_numeric(ExprType t) {
   return t == EXPR_TYPE_INT || t == EXPR_TYPE_DOUBLE;
 }
 
+static ExprType int_or_double(ExprType l, ExprType r);
+
+static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
+  while (st->top >= 0 && st->items[st->top] == T_UNARY_MINUS_MARK) {
+    ExprType t = EXPR_TYPE_UNKNOWN;
+    ASTNode *n = NULL;
+    st->top--;
+    if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &n))
+      return SYN_ANAL_ERR;
+    if (t != EXPR_TYPE_UNKNOWN && !is_numeric(t))
+      return STATIC_SEM_TYPE_ERR;
+    if (!tstack_push(ts, t) ||
+        !ast_stack_push(as, ast_make_unary(T_MINUS_SIGN, n)))
+      return COMPILER_ERR;
+  }
+  return SUCCESS;
+}
+
 static ExprType int_or_double(ExprType l, ExprType r) {
   if (l == EXPR_TYPE_DOUBLE) {
     return EXPR_TYPE_DOUBLE;
@@ -584,11 +603,21 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         CONSUME_TOKEN_GUARD(parser);
       }
       expect_operand = false;
+      Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
+      if (uerr != SUCCESS)
+        return uerr;
+
     } else if (is_open_BRACKET(lookahead.token_type) && expect_operand) {
       fprintf(stderr, "[DEBUG] branch: OPEN BRACKET (\n");
       stack_push(&parser->stack, lookahead.token_type);
       CONSUME_TOKEN_GUARD(parser);
       BRACKET_depth++;
+
+    } else if (lookahead.token_type == T_MINUS_SIGN && expect_operand) {
+      fprintf(stderr, "[DEBUG] branch: UNARY MINUS\n");
+      stack_push(&parser->stack, T_UNARY_MINUS_MARK);
+      CONSUME_TOKEN_GUARD(parser);
+
     } else if (is_close_BRACKET(lookahead.token_type)) {
       fprintf(stderr, "[DEBUG] branch: CLOSE BRACKET ), expect_operand = %d\n",
               expect_operand);
@@ -608,6 +637,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
           }
           CONSUME_TOKEN_GUARD(parser);
           expect_operand = false;
+          Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
+          if (uerr != SUCCESS)
+            return uerr;
         } else {
           fprintf(stderr, "[DEBUG] empty bracket check failed, stack top "
                           "mismatch (SYN_ANAL_ERR)\n");
@@ -645,6 +677,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         }
         CONSUME_TOKEN_GUARD(parser);
         expect_operand = false;
+        Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
+        if (uerr != SUCCESS)
+          return uerr;
       }
     } else if (is_operator_token(lookahead.token_type) && !expect_operand) {
       TokenType next = lookahead.token_type;
