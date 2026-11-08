@@ -659,11 +659,13 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
-static int parse_condition(ParserCtx *ctx) {
+static int parse_condition(ParserCtx *ctx, TokenType terminator) {
   ExprType type = EXPR_TYPE_UNKNOWN;
   int status = parse_expression(ctx, NULL, &type);
   if (status != 0)
     return status;
+  if (ctx->current_token.token_type != terminator)
+    return ERR_SYNTAX;
   if (type != EXPR_TYPE_BOOL && type != EXPR_TYPE_UNKNOWN)
     return STATIC_SEM_TYPE_ERR;
   return 0;
@@ -677,7 +679,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
   if ((status = match(ctx, T_KW_IF)) != 0)
     return status;
 
-  if ((status = parse_condition(ctx)) != 0)
+  if ((status = parse_condition(ctx, T_KW_THEN)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_THEN)) != 0)
@@ -706,7 +708,7 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent) {
   if ((status = match(ctx, T_KW_WHILE)) != 0)
     return status;
 
-  if ((status = parse_condition(ctx)) != 0)
+  if ((status = parse_condition(ctx, T_KW_DO)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_DO)) != 0)
