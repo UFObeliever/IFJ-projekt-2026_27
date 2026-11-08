@@ -18,6 +18,8 @@ typedef struct ParserCtx {
   int main_count;
   Token peek;
   bool has_peek;
+  int line_indent;
+  bool at_bol;
 } ParserCtx;
 
 Token look_next_eol(ParserCtx *parser);

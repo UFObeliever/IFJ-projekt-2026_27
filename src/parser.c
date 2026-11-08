@@ -29,11 +29,24 @@ static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
 
 static Token fetch_token(ParserCtx *ctx) {
+  Token t;
   if (ctx->has_peek) {
     ctx->has_peek = false;
-    return ctx->peek;
+    t = ctx->peek;
+  } else {
+    t = get_next_token(ctx->lexer);
   }
-  return get_next_token(ctx->lexer);
+  if (t.token_type == T_EOL) {
+    ctx->line_indent = 0;
+    ctx->at_bol = true;
+  } else if (t.token_type == T_INDENTS) {
+    if (ctx->at_bol)
+      ctx->line_indent = t.token_indents.count;
+    ctx->at_bol = false;
+  } else {
+    ctx->at_bol = false;
+  }
+  return t;
 }
 
 static void advance(ParserCtx *ctx) {
@@ -95,6 +108,8 @@ Token peek_token(ParserCtx *parser) {
 
 int parse_program(ParserCtx *ctx) {
   ctx->has_peek = false;
+  ctx->line_indent = 0;
+  ctx->at_bol = true;
   advance_(ctx);
   TOKEN_CHEK(ctx->current_token)
   int status;
@@ -143,6 +158,8 @@ static int parse_function_list(ParserCtx *ctx) {
   int status;
   if (ctx->current_token.token_type == T_FUNC_MAIN ||
       ctx->current_token.token_type == T_KW_DEF) {
+    if (ctx->line_indent != 0)
+      return ERR_SYNTAX;
     if ((status = parse_defsingle(ctx)) != 0)
       return status;
     return parse_function_list(ctx);
@@ -308,6 +325,10 @@ static int parse_defsingle(ParserCtx *ctx) {
   } else {
     ExprType body_type = EXPR_TYPE_UNKNOWN;
     status = parse_expression(ctx, NULL, &body_type);
+    if (status == 0 && ctx->current_token.token_type != T_EOL &&
+        ctx->current_token.token_type != T_EOF)
+      status = (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
+                                                          : ERR_SYNTAX;
     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
         !types_compatible(ret_type, body_type))
       status = STATIC_SEM_TYPE_ERR;
