@@ -421,6 +421,9 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
   (void)consume_token(parser);
   (void)consume_token(parser);
 
+  int argc = 0;
+  Error deferred = SUCCESS;
+
   if (parser->current_token.token_type == T_ERROR)
     return LEX_ANAL_ERR;
   if (parser->current_token.token_type == T_CLOSE_BRACKET) {
@@ -431,6 +434,7 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
       Error err = parse_expression(parser, NULL, &at);
       if (err != SUCCESS)
         return err;
+      argc++;
 
       TokenType t = parser->current_token.token_type;
       if (t == T_ERROR)
@@ -447,6 +451,10 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
     }
   }
 
+  if (argc != fn->f_param_count)
+    deferred = STATIC_SEM_ERR;
+  if (deferred != SUCCESS)
+    return deferred;
   if (fn->type == T_ERROR)
     return STATIC_SEM_TYPE_ERR;
 

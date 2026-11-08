@@ -373,7 +373,7 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->declared = true;
   entry->defined = true;
   entry->type = T_KW_INT;
-  entry->f_param_count = 1;
+  entry->f_param_count = 2;
   entry->f_params = func_params;
   smt_insert_global(smt, "ord", entry);
 
