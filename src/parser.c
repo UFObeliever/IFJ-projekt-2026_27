@@ -11,20 +11,30 @@
     }                                                                          \
   } while (0);
 
+typedef enum { SK_OTHER, SK_EXPR, SK_RETURN, SK_IF } StmtKind;
+
+typedef struct {
+  StmtKind kind;
+  ExprType type;
+  bool returns;
+} StmtInfo;
+
 static void advance(ParserCtx *ctx);
 static int match(ParserCtx *ctx, TokenType expected);
 static int parse_prolog(ParserCtx *ctx);
 static int parse_function_list(ParserCtx *ctx);
 static int parse_defsingle(ParserCtx *ctx);
-static int parse_statement_list(ParserCtx *ctx, int current_indent);
-static int parse_statement(ParserCtx *ctx, int current_indent);
+static int parse_statement_list(ParserCtx *ctx, int current_indent,
+                                StmtInfo *out);
+static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info);
 static int parse_valdef(ParserCtx *ctx);
 static int parse_vardef(ParserCtx *ctx);
 static int parse_assignment(ParserCtx *ctx);
-static int parse_if_statement(ParserCtx *ctx, int current_indent);
+static int parse_if_statement(ParserCtx *ctx, int current_indent,
+                              StmtInfo *info);
 static int parse_while_statement(ParserCtx *ctx, int current_indent);
-static int parse_return_statement(ParserCtx *ctx);
-static int parse_block(ParserCtx *ctx, int current_indent);
+static int parse_return_statement(ParserCtx *ctx, StmtInfo *info);
+static int parse_block(ParserCtx *ctx, int current_indent, StmtInfo *out);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
 
@@ -321,7 +331,20 @@ static int parse_defsingle(ParserCtx *ctx) {
   ctx->ret_type = ret_type;
 
   if (ctx->current_token.token_type == T_EOL) {
-    status = parse_block(ctx, 0);
+    StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+    status = parse_block(ctx, 0, &info);
+    if (status == 0) {
+      TokenType t = ctx->current_token.token_type;
+      if (t == T_ERROR)
+        status = LEX_ANAL_ERR;
+      else if (t != T_EOF &&
+               (ctx->line_indent != 0 || (t != T_FUNC_MAIN && t != T_KW_DEF)))
+        status = ERR_SYNTAX;
+    }
+    if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
+        !info.returns &&
+        !(info.kind == SK_EXPR && types_compatible(ret_type, info.type)))
+      status = STATIC_SEM_TYPE_ERR;
   } else {
     ExprType body_type = EXPR_TYPE_UNKNOWN;
     status = parse_expression(ctx, NULL, &body_type);
@@ -346,7 +369,9 @@ static int parse_defsingle(ParserCtx *ctx) {
   return status;
 }
 
-static int parse_statement_list(ParserCtx *ctx, int current_indent) {
+static int parse_statement_list(ParserCtx *ctx, int current_indent,
+                                StmtInfo *out) {
+  StmtInfo last = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
   while (true) {
     if (ctx->current_token.token_type == T_EOL ||
         (ctx->current_token.token_type == T_INDENTS &&
@@ -370,16 +395,25 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent) {
       break;
     }
 
-    int status = parse_statement(ctx, current_indent);
+    StmtInfo cur = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+    int status = parse_statement(ctx, current_indent, &cur);
     if (status != 0)
       return status;
+    last = cur;
   }
+  if (out != NULL)
+    *out = last;
   return 0;
 }
 
-static int parse_expr_statement(ParserCtx *ctx) {
+static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
   ExprType t = EXPR_TYPE_UNKNOWN;
-  return parse_expression(ctx, NULL, &t);
+  int status = parse_expression(ctx, NULL, &t);
+  if (status == 0) {
+    info->kind = SK_EXPR;
+    info->type = t;
+  }
+  return status;
 }
 
 static int end_of_simple_statement(ParserCtx *ctx, int status) {
@@ -397,27 +431,27 @@ static int end_of_simple_statement(ParserCtx *ctx, int status) {
   return 0;
 }
 
-static int parse_statement(ParserCtx *ctx, int current_indent) {
+static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   switch (ctx->current_token.token_type) {
   case T_KW_VAL:
     return end_of_simple_statement(ctx, parse_valdef(ctx));
   case T_KW_VAR:
     return end_of_simple_statement(ctx, parse_vardef(ctx));
   case T_KW_IF:
-    return parse_if_statement(ctx, current_indent);
+    return parse_if_statement(ctx, current_indent, info);
   case T_KW_WHILE:
     return parse_while_statement(ctx, current_indent);
   case T_KW_RETURN:
-    return end_of_simple_statement(ctx, parse_return_statement(ctx));
+    return end_of_simple_statement(ctx, parse_return_statement(ctx, info));
   case T_IDENTIFICATOR:
     if (peek_token(ctx).token_type == T_ASSIGN)
       return end_of_simple_statement(ctx, parse_assignment(ctx));
-    return end_of_simple_statement(ctx, parse_expr_statement(ctx));
+    return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
   case T_STRING_LITERAL:
   case T_OPEN_BRACKET:
-    return end_of_simple_statement(ctx, parse_expr_statement(ctx));
+    return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   default:
     return ERR_SYNTAX;
   }
@@ -598,10 +632,12 @@ static int parse_assignment(ParserCtx *ctx) {
   return 0;
 }
 
-static int parse_return_statement(ParserCtx *ctx) {
+static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_RETURN)) != 0)
     return status;
+  info->kind = SK_RETURN;
+  info->returns = true;
 
   TokenType next = ctx->current_token.token_type;
   TOKEN_CHEK(ctx->current_token)
@@ -633,8 +669,11 @@ static int parse_condition(ParserCtx *ctx) {
   return 0;
 }
 
-static int parse_if_statement(ParserCtx *ctx, int current_indent) {
+static int parse_if_statement(ParserCtx *ctx, int current_indent,
+                              StmtInfo *info) {
   int status;
+  StmtInfo then_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+  StmtInfo else_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
   if ((status = match(ctx, T_KW_IF)) != 0)
     return status;
 
@@ -644,7 +683,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent) {
   if ((status = match(ctx, T_KW_THEN)) != 0)
     return status;
 
-  if ((status = parse_block(ctx, current_indent)) != 0)
+  if ((status = parse_block(ctx, current_indent, &then_info)) != 0)
     return status;
 
   while (ctx->current_token.token_type == T_EOL)
@@ -654,7 +693,12 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent) {
     return ERR_SYNTAX;
   if ((status = match(ctx, T_KW_ELSE)) != 0)
     return status;
-  return parse_block(ctx, current_indent);
+  if ((status = parse_block(ctx, current_indent, &else_info)) != 0)
+    return status;
+
+  info->kind = SK_IF;
+  info->returns = then_info.returns && else_info.returns;
+  return 0;
 }
 
 static int parse_while_statement(ParserCtx *ctx, int current_indent) {
@@ -668,11 +712,11 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent) {
   if ((status = match(ctx, T_KW_DO)) != 0)
     return status;
 
-  return parse_block(ctx, current_indent);
+  return parse_block(ctx, current_indent, NULL);
 }
 
 // Upravit block aby řešil tabulatory (začátek řádku x někde jinde)
-static int parse_block(ParserCtx *ctx, int expected_indent) {
+static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out) {
   int status;
 
   if ((status = match(ctx, T_EOL)) != 0)
@@ -691,7 +735,7 @@ static int parse_block(ParserCtx *ctx, int expected_indent) {
   advance(ctx);
 
   smt_scope_add(&ctx->smt);
-  status = parse_statement_list(ctx, block_indent);
+  status = parse_statement_list(ctx, block_indent, out);
   smt_scope_remove(&ctx->smt);
   return status;
 }
