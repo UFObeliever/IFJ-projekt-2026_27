@@ -348,11 +348,6 @@ static int parse_defsingle(ParserCtx *ctx) {
 
 static int parse_statement_list(ParserCtx *ctx, int current_indent) {
   while (true) {
-    if (ctx->current_token.token_type == T_INDENTS &&
-        ctx->current_token.token_indents.count < current_indent) {
-      break;
-    }
-
     if (ctx->current_token.token_type == T_EOL ||
         (ctx->current_token.token_type == T_INDENTS &&
          ctx->current_token.token_indents.count == current_indent)) {
@@ -360,9 +355,16 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent) {
       TOKEN_CHEK(ctx->current_token)
       continue;
     }
+    TOKEN_CHEK(ctx->current_token)
 
-    if (ctx->current_token.token_type == T_EOF ||
-        ctx->current_token.token_type == T_KW_ELSE ||
+    if (ctx->current_token.token_type == T_EOF)
+      break;
+    if (ctx->line_indent < current_indent)
+      break;
+    if (ctx->line_indent > current_indent)
+      return ERR_SYNTAX;
+
+    if (ctx->current_token.token_type == T_KW_ELSE ||
         ctx->current_token.token_type == T_FUNC_MAIN ||
         ctx->current_token.token_type == T_KW_DEF) {
       break;
