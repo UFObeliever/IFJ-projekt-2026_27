@@ -295,7 +295,7 @@ void smt_insert_builtin_funcs(symtable *smt) {
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value")};
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_ERROR};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -312,8 +312,7 @@ void smt_insert_builtin_funcs(symtable *smt) {
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_INT};
+  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_DOUBLE};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;

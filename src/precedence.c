@@ -411,6 +411,25 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   return SUCCESS;
 }
 
+static bool arg_type_ok(TokenType param, ExprType actual) {
+  if (actual == EXPR_TYPE_UNKNOWN)
+    return true;
+  if (actual == EXPR_TYPE_BOOL)
+    return false;
+  switch (param) {
+  case T_KW_INT:
+    return actual == EXPR_TYPE_INT;
+  case T_KW_DOUBLE:
+    return actual == EXPR_TYPE_INT || actual == EXPR_TYPE_DOUBLE;
+  case T_KW_STRING:
+    return actual == EXPR_TYPE_STRING;
+  case T_KW_UNIT:
+    return actual == EXPR_TYPE_UNIT;
+  default:
+    return true;
+  }
+}
+
 static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
@@ -434,6 +453,9 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
       Error err = parse_expression(parser, NULL, &at);
       if (err != SUCCESS)
         return err;
+      if (argc >= fn->f_param_count ||
+          !arg_type_ok(fn->f_params[argc].type, at))
+        deferred = STATIC_SEM_ERR;
       argc++;
 
       TokenType t = parser->current_token.token_type;
