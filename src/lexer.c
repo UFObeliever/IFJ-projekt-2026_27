@@ -246,14 +246,9 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'e' || c == 'E') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_E;
-      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       } else {
-        // Toto tedy špatně?? -> spíš pořešit, že pokud je další mezera, tak
-        // make token INT, jinak err
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_ERROR();
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       }
       break;
 
@@ -270,14 +265,9 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'e' || c == 'E') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_E;
-      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       } else {
-        // Toto tedy špatně?? -> spíš pořešit, že pokud je další mezera, tak
-        // make token INT, jinak err
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_ERROR();
+        return MAKE_TOKEN_LEXEME(T_INT_LITERAL, &ctx->Buffer);
       }
       break;
 
@@ -350,12 +340,9 @@ Token lex_numbers(LexerCtx *ctx) {
       } else if (c == 'd' || c == 'D') {
         sb_append_char(&ctx->Buffer, input_char);
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
-      } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
-        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN_ERROR();
+        return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
       }
       break;
     default:
@@ -770,8 +757,9 @@ Token get_next_token(LexerCtx *ctx) {
 
   if (c == '\t') {
     while (c == '\t') {
-      continue;
+      c = fgetc(ctx->input);
     }
+    ungetc(c, ctx->input);
     return MAKE_TOKEN_TAB();
   }
 
