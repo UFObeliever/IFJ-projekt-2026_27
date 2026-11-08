@@ -349,6 +349,11 @@ static int end_of_simple_statement(ParserCtx *ctx, int status) {
   if (status != 0)
     return status;
   TOKEN_CHEK(ctx->current_token)
+  if (ctx->current_token.token_type == T_SEMICOLON) {
+    advance(ctx);
+    TOKEN_CHEK(ctx->current_token)
+    return 0;
+  }
   if (ctx->current_token.token_type != T_EOL &&
       ctx->current_token.token_type != T_EOF)
     return ERR_SYNTAX;
