@@ -245,6 +245,8 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
     if (ctx->current_token.token_type == T_COMMA) {
       advance(ctx);
       TOKEN_CHEK(ctx->current_token)
+      if (ctx->current_token.token_type == T_CLOSE_BRACKET)
+        return ERR_SYNTAX;
       continue;
     }
     break;
