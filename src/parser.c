@@ -592,8 +592,9 @@ static int parse_return_statement(ParserCtx *ctx) {
   if ((status = parse_expression(ctx, NULL, &expr_type)) != 0)
     return status;
 
-  if (ctx->ret_type != T_ERROR && ctx->ret_type != T_KW_UNIT &&
-      !types_compatible(ctx->ret_type, expr_type))
+  if (ctx->ret_type == T_ERROR)
+    return STATIC_SEM_TYPE_ERR;
+  if (ctx->ret_type != T_KW_UNIT && !types_compatible(ctx->ret_type, expr_type))
     return STATIC_SEM_TYPE_ERR;
 
   return 0;
