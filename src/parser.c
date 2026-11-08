@@ -647,12 +647,11 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent) {
   if ((status = parse_block(ctx, current_indent)) != 0)
     return status;
 
-  while (ctx->current_token.token_type == T_EOL ||
-         (ctx->current_token.token_type == T_INDENTS &&
-          ctx->current_token.token_indents.count == current_indent)) {
+  while (ctx->current_token.token_type == T_EOL)
     advance(ctx);
-  }
-
+  if (ctx->current_token.token_type != T_KW_ELSE ||
+      ctx->line_indent != current_indent)
+    return ERR_SYNTAX;
   if ((status = match(ctx, T_KW_ELSE)) != 0)
     return status;
   return parse_block(ctx, current_indent);
