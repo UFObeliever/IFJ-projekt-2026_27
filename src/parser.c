@@ -25,6 +25,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent);
 static int parse_while_statement(ParserCtx *ctx, int current_indent);
 static int parse_return_statement(ParserCtx *ctx);
 static int parse_block(ParserCtx *ctx, int current_indent);
+static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
 
 static Token fetch_token(ParserCtx *ctx) {
@@ -310,6 +311,13 @@ static int parse_defsingle(ParserCtx *ctx) {
     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
         !types_compatible(ret_type, body_type))
       status = STATIC_SEM_TYPE_ERR;
+    if (status == 0 && ret_type == T_ERROR) {
+      TokenType inferred = kw_from_expr_type(body_type);
+      if (body_type == EXPR_TYPE_BOOL || inferred == T_ERROR)
+        status = STATIC_SEM_TYPE_ERR;
+      else
+        fentry->type = inferred;
+    }
   }
 
   ctx->ret_type = T_ERROR;
