@@ -25,6 +25,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent);
 static int parse_while_statement(ParserCtx *ctx, int current_indent);
 static int parse_return_statement(ParserCtx *ctx);
 static int parse_block(ParserCtx *ctx, int current_indent);
+static bool types_compatible(TokenType declared, ExprType actual);
 
 static Token fetch_token(ParserCtx *ctx) {
   if (ctx->has_peek) {
@@ -301,10 +302,15 @@ static int parse_defsingle(ParserCtx *ctx) {
   }
   ctx->ret_type = ret_type;
 
-  if (ctx->current_token.token_type == T_EOL)
+  if (ctx->current_token.token_type == T_EOL) {
     status = parse_block(ctx, 0);
-  else
-    status = parse_expression(ctx, NULL, NULL);
+  } else {
+    ExprType body_type = EXPR_TYPE_UNKNOWN;
+    status = parse_expression(ctx, NULL, &body_type);
+    if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
+        !types_compatible(ret_type, body_type))
+      status = STATIC_SEM_TYPE_ERR;
+  }
 
   ctx->ret_type = T_ERROR;
   smt_scope_remove(&ctx->smt);
