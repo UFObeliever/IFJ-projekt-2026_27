@@ -411,6 +411,35 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   return SUCCESS;
 }
 
+static Error parse_call(ParserCtx *parser, ExprType *out_type,
+                        ASTNode **out_node) {
+  const char *name = parser->current_token.token_lexeme.lexeme;
+  symtable_entry *fn = NULL;
+  if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function)
+    return UNDEF_FN_ERR;
+
+  (void)consume_token(parser);
+  (void)consume_token(parser);
+
+  if (parser->current_token.token_type == T_ERROR)
+    return LEX_ANAL_ERR;
+  if (parser->current_token.token_type != T_CLOSE_BRACKET)
+    return STATIC_SEM_TYPE_ERR;
+  (void)consume_token(parser);
+
+  if (fn->type == T_ERROR)
+    return STATIC_SEM_TYPE_ERR;
+
+  *out_type = expr_type_from_kw(fn->type);
+  ASTNode *node = ast_create_node(AST_FUNC_CALL);
+  if (node != NULL) {
+    node->data.func_call.name = strdup(name);
+    node->data.func_call.arguments = NULL;
+  }
+  *out_node = node;
+  return SUCCESS;
+}
+
 Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
                        ExprType *out_type) {
   fprintf(stderr, "[DEBUG] === parse_expression START ===\n");
@@ -465,8 +494,14 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
               lookahead.token_type);
       ASTNode *leaf = NULL;
       ExprType t = expr_type_from_token(lookahead.token_type);
+      bool is_call = lookahead.token_type == T_IDENTIFICATOR &&
+                     peek_token(parser).token_type == T_OPEN_BRACKET;
 
-      if (lookahead.token_type == T_IDENTIFICATOR) {
+      if (is_call) {
+        Error err = parse_call(parser, &t, &leaf);
+        if (err != SUCCESS)
+          return err;
+      } else if (lookahead.token_type == T_IDENTIFICATOR) {
         Error err = check_identifier_in_expr(parser, &lookahead, &t);
         if (err != SUCCESS)
           return err;
@@ -484,7 +519,9 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
       if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }
-      CONSUME_TOKEN_GUARD(parser);
+      if (!is_call) {
+        CONSUME_TOKEN_GUARD(parser);
+      }
       expect_operand = false;
     } else if (is_open_BRACKET(lookahead.token_type) && expect_operand) {
       fprintf(stderr, "[DEBUG] branch: OPEN BRACKET (\n");
