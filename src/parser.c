@@ -318,20 +318,30 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent) {
   return 0;
 }
 
+static int end_of_simple_statement(ParserCtx *ctx, int status) {
+  if (status != 0)
+    return status;
+  TOKEN_CHEK(ctx->current_token)
+  if (ctx->current_token.token_type != T_EOL &&
+      ctx->current_token.token_type != T_EOF)
+    return ERR_SYNTAX;
+  return 0;
+}
+
 static int parse_statement(ParserCtx *ctx, int current_indent) {
   switch (ctx->current_token.token_type) {
   case T_KW_VAL:
-    return parse_valdef(ctx);
+    return end_of_simple_statement(ctx, parse_valdef(ctx));
   case T_KW_VAR:
-    return parse_vardef(ctx);
+    return end_of_simple_statement(ctx, parse_vardef(ctx));
   case T_KW_IF:
     return parse_if_statement(ctx, current_indent);
   case T_KW_WHILE:
     return parse_while_statement(ctx, current_indent);
   case T_KW_RETURN:
-    return parse_return_statement(ctx);
+    return end_of_simple_statement(ctx, parse_return_statement(ctx));
   case T_IDENTIFICATOR:
-    return parse_assignment(ctx);
+    return end_of_simple_statement(ctx, parse_assignment(ctx));
   default:
     return ERR_SYNTAX;
   }
