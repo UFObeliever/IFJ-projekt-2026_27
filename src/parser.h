@@ -5,7 +5,7 @@
 #include "symtable.h"
 
 typedef struct {
-  TokenType items[256];
+  TokenType items[1024];
   int top;
 } PrecedenceStack;
 

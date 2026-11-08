@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 #define TYPE_STACK_MAX 256
+#define PREC_STACK_MAX                                                         \
+  ((int)(sizeof(((PrecedenceStack *)0)->items) / sizeof(TokenType)))
 #define T_UNARY_MINUS_MARK ((TokenType)1000)
 #define CONSUME_TOKEN_GUARD(parser)                                            \
   do {                                                                         \
@@ -71,7 +73,7 @@ static void stack_clear(PrecedenceStack *s) {
 }
 
 static bool stack_push(PrecedenceStack *s, TokenType t) {
-  if (s->top >= 255) {
+  if (s->top >= PREC_STACK_MAX - 1) {
     fprintf(stderr, "[DEBUG] precedence stack overflow!\n");
     return false;
   }
