@@ -451,6 +451,11 @@ static bool arg_type_ok(TokenType param, ExprType actual) {
   }
 }
 
+static void skip_eols(ParserCtx *parser) {
+  while (parser->current_token.token_type == T_EOL)
+    (void)consume_token(parser);
+}
+
 static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
@@ -463,6 +468,7 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
 
   int argc = 0;
   Error deferred = SUCCESS;
+  skip_eols(parser);
 
   if (parser->current_token.token_type == T_ERROR)
     return LEX_ANAL_ERR;
@@ -479,11 +485,25 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
         deferred = STATIC_SEM_ERR;
       argc++;
 
+      skip_eols(parser);
+
       TokenType t = parser->current_token.token_type;
       if (t == T_ERROR)
         return LEX_ANAL_ERR;
       if (t == T_COMMA) {
         (void)consume_token(parser);
+        t = parser->current_token.token_type;
+        if (t == T_ERROR)
+          return LEX_ANAL_ERR;
+        if (t == T_CLOSE_BRACKET)
+          return SYN_ANAL_ERR;
+        skip_eols(parser);
+        if (parser->current_token.token_type == T_ERROR)
+          return LEX_ANAL_ERR;
+        if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+          (void)consume_token(parser);
+          break;
+        }
         continue;
       }
       if (t == T_CLOSE_BRACKET) {
