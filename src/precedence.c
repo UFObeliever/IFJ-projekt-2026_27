@@ -472,9 +472,8 @@ sym table (na výstupu bude pole tokenů zo vstupu) , jednoduchší    2) vyře�
 náročnejší
     */
   }
-
-  (void)consume_token(parser);
-  (void)consume_token(parser);
+  CONSUME_TOKEN_GUARD(parser)
+  CONSUME_TOKEN_GUARD(parser)
 
   int argc = 0;
   Error deferred = SUCCESS;
@@ -483,7 +482,7 @@ náročnejší
   if (parser->current_token.token_type == T_ERROR)
     return LEX_ANAL_ERR;
   if (parser->current_token.token_type == T_CLOSE_BRACKET) {
-    (void)consume_token(parser);
+    CONSUME_TOKEN_GUARD(parser)
   } else {
     while (true) {
       ExprType at = EXPR_TYPE_UNKNOWN;
@@ -501,7 +500,7 @@ náročnejší
       if (t == T_ERROR)
         return LEX_ANAL_ERR;
       if (t == T_COMMA) {
-        (void)consume_token(parser);
+        CONSUME_TOKEN_GUARD(parser)
         t = parser->current_token.token_type;
         if (t == T_ERROR)
           return LEX_ANAL_ERR;
@@ -511,13 +510,13 @@ náročnejší
         if (parser->current_token.token_type == T_ERROR)
           return LEX_ANAL_ERR;
         if (parser->current_token.token_type == T_CLOSE_BRACKET) {
-          (void)consume_token(parser);
+          CONSUME_TOKEN_GUARD(parser)
           break;
         }
         continue;
       }
       if (t == T_CLOSE_BRACKET) {
-        (void)consume_token(parser);
+        CONSUME_TOKEN_GUARD(parser)
         break;
       }
       return SYN_ANAL_ERR;

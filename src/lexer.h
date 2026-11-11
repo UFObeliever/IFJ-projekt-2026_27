@@ -117,7 +117,7 @@ typedef enum State {
   S_MAIN_A,
   S_MAIN_I,
   S_MAIN_N,
-
+  S_DOT_CHECK_DOUBLE,
 } State;
 
 typedef struct {
