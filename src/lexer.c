@@ -157,15 +157,15 @@ Token lex_white_space(LexerCtx *ctx) {
       } else {
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-        return MAKE_TOKEN(T_WHITESPACE_SEP);
+        return MAKE_TOKEN_ERROR();
       }
-      break;
+      break; //
 
-    default:
+    default: //
       // should never happen!!
       assert(false && "State machine for indents fell through!");
       return MAKE_TOKEN_ERROR();
-      break;
+      break; //
     }
   }
 }
@@ -655,7 +655,7 @@ Token lex_equal(LexerCtx *ctx) {
   }
 }
 
-Token lex_compare_l(LexerCtx *ctx) {
+Token lex_compare_lesser(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
@@ -667,7 +667,7 @@ Token lex_compare_l(LexerCtx *ctx) {
   }
 }
 
-Token lex_compare_g(LexerCtx *ctx) {
+Token lex_compare_greater(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
@@ -727,10 +727,10 @@ Token lex_main_func(LexerCtx *ctx) {
       }
       break;
 
-    default:
+    default: //
       assert(false && "Lex '@main' state machine fell through!");
       return MAKE_TOKEN_ERROR();
-      break;
+      break; //
     }
   }
 }
@@ -749,7 +749,7 @@ Token get_next_token(LexerCtx *ctx) {
   }
 
   /* dopsat stavy z jednotlivých FSM */
-  if (c == ' ' /*|| c == '\t'*/) {
+  if (c == ' ') {
     DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     return lex_white_space(ctx);
@@ -811,16 +811,22 @@ Token get_next_token(LexerCtx *ctx) {
     return lex_equal(ctx);
   }
   if (c == '>') {
-    return lex_compare_g(ctx);
+    return lex_compare_greater(ctx);
   }
   if (c == '<') {
-    return lex_compare_l(ctx);
+    return lex_compare_lesser(ctx);
   }
 
   if (c == '!') {
     return lex_not_equal(ctx);
   }
   if (c == '.') {
+    int c2 = fgetc(ctx->input);
+    ungetc(c2, ctx->input);
+    if (isdigit(c2) || c2 == 'D' || c2 == 'd') {
+      ungetc(c, ctx->input);
+      return lex_numbers(ctx);
+    }
     return MAKE_TOKEN(T_DOT);
   }
   if (c == '(') {

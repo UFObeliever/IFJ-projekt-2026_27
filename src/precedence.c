@@ -460,8 +460,18 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
   symtable_entry *fn = NULL;
-  if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function)
+  if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function) {
+    fprintf(stderr, "DEBUG: lexeme not found!: %s\n", name);
     return UNDEF_FN_ERR;
+
+    /*
+    dva způsoby jak to vyřešit:
+    1) přejít přes vstup -> hledat a parsovat jenom definice funkcí, uložit do
+sym table (na výstupu bude pole tokenů zo vstupu) , jednoduchší    2) vyřešit to
+částí sémantické analýzy, že nějaké funkce mohou být definované později,
+náročnejší
+    */
+  }
 
   (void)consume_token(parser);
   (void)consume_token(parser);
