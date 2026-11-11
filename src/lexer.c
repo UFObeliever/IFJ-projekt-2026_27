@@ -500,9 +500,9 @@ Token lex_string(LexerCtx *ctx) {
 Token lex_div_com(LexerCtx *ctx) {
   State current_state = S_BACKSLASH_COMM;
   int comment_nesting = 0;
-
   while (1) {
     int c = fgetc(ctx->input);
+    DEBUG_LOG("current state: %d\n", current_state);
     DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     switch (current_state) {
     case S_BACKSLASH_COMM:
@@ -511,6 +511,7 @@ Token lex_div_com(LexerCtx *ctx) {
       } else if (c == '*') {
         current_state = S_MCOM_SINGLE;
       } else {
+        ungetc(c, ctx->input);
         return MAKE_TOKEN(T_DIVIDE);
       }
       break;
@@ -539,7 +540,14 @@ Token lex_div_com(LexerCtx *ctx) {
 
     case S_MCOM_SINGLE_END_STAR:
       if (c == '/') {
-        return MAKE_TOKEN(T_WHITESPACE_SEP); // S_MSTR_SINGLE_END mělo by stačit
+        if (comment_nesting == 0) {
+          return MAKE_TOKEN(
+              T_WHITESPACE_SEP); // S_MSTR_SINGLE_END mělo by stačit
+        }
+        comment_nesting--;
+        current_state = S_MCOM_SINGLE;
+      } else if (c == '*') {
+        continue;
       } else if (c == EOF) {
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
@@ -554,36 +562,16 @@ Token lex_div_com(LexerCtx *ctx) {
     case S_MCOM_SINGLE_NEST_BACKSLASH:
       if (c == '*') {
         comment_nesting++;
-        current_state = S_MCOM_SINGLE_NEST_STAR_START;
+        DEBUG_LOG("Number of iterations %d", comment_nesting);
+        current_state = S_MCOM_SINGLE;
+      } else if (c == '/') {
+        continue;
       } else if (c == '\n') {
         current_state = S_MCOM_MULTILINE;
+      } else if (c == EOF) {
+        return MAKE_TOKEN_ERROR();
       } else {
         current_state = S_MCOM_SINGLE;
-      }
-      break;
-
-    case S_MCOM_SINGLE_NEST_STAR_START:
-      if (c == '*') {
-        current_state = S_MCOM_SINGLE_NEST_STAR_STAR;
-      } else if (c == '\n') {
-        current_state = S_MCOM_MULTILINE;
-      } else {
-        current_state = S_MCOM_SINGLE_NEST_STAR_START; // continue teoreticky
-      }
-      break;
-
-    case S_MCOM_SINGLE_NEST_STAR_STAR:
-      if (c == '/') {
-        comment_nesting--;
-        if (comment_nesting == 0) {
-          current_state = S_MCOM_SINGLE;
-        } else {
-          current_state = S_MCOM_SINGLE_NEST_BACKSLASH;
-        }
-      } else if (c == '\n') {
-        current_state = S_MCOM_MULTILINE;
-      } else {
-        current_state = S_MCOM_SINGLE_NEST_STAR_STAR;
       }
       break;
 
@@ -595,7 +583,7 @@ Token lex_div_com(LexerCtx *ctx) {
       } else if (c == EOF) {
         return MAKE_TOKEN_ERROR();
       } else {
-        current_state = S_MCOM_MULTILINE;
+        // current_state = S_MCOM_MULTILINE;
       }
       break;
 
@@ -608,6 +596,10 @@ Token lex_div_com(LexerCtx *ctx) {
           comment_nesting--;
           current_state = S_MCOM_MULTILINE;
         }
+      } else if (c == '*') {
+        continue;
+      } else if (c == EOF) {
+        return MAKE_TOKEN_ERROR();
       } else {
         current_state = S_MCOM_MULTILINE;
       }
@@ -630,8 +622,14 @@ Token lex_div_com(LexerCtx *ctx) {
     case S_MCOM_MULT_NEST_BACKSLASH:
       if (c == '*') {
         comment_nesting++;
+        current_state = S_MCOM_MULTILINE;
+      } else if (c == '/') {
+        continue;
+      } else if (c == EOF) {
+        return MAKE_TOKEN_ERROR();
+      } else {
+        current_state = S_MCOM_MULTILINE;
       }
-      current_state = S_MCOM_MULTILINE;
       break;
 
     default:
