@@ -1,5 +1,7 @@
 #include "lexer.h"
 #include "parser.h"
+#include "generator.h"
+#include "ast.h"
 #include <stdio.h>
 int main(void) {
   LexerCtx lexer_ctx;
@@ -11,8 +13,15 @@ int main(void) {
   parser.stack.top = -1;
   parser.ret_type = T_ERROR;
   parser.main_count = 0;
+  parser.funcs = NULL;
+  parser.funcs_tail = NULL;
 
   int result = parse_program(&parser);
+  if (result == 0) {
+    ASTNode *root = ast_create_node(AST_PROGRAM);
+    root->data.block.statements = parser.funcs;
+    result = generate_program(root, stdout);
+  }
 
   smt_dispose(&parser.smt);
 

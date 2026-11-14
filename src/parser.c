@@ -2,11 +2,13 @@
 #include "precedence.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
 
 #define ERR_SYNTAX 2
 #define TOKEN_CHEK(token)                                                      \
   do {                                                                         \
-    if (token.token_type == T_ERROR) {                                         \
+    if ((token).token_type == T_ERROR) {                                         \
       return LEX_ANAL_ERR;                                                     \
     }                                                                          \
   } while (0);
@@ -17,6 +19,7 @@ typedef struct {
   StmtKind kind;
   ExprType type;
   bool returns;
+  ASTNode *node;
 } StmtInfo;
 
 static void advance(ParserCtx *ctx);
@@ -25,18 +28,35 @@ static int parse_prolog(ParserCtx *ctx);
 static int parse_function_list(ParserCtx *ctx);
 static int parse_defsingle(ParserCtx *ctx);
 static int parse_statement_list(ParserCtx *ctx, int current_indent,
-                                StmtInfo *out);
+                                StmtInfo *out, ASTNode **list);
 static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info);
-static int parse_valdef(ParserCtx *ctx);
-static int parse_vardef(ParserCtx *ctx);
-static int parse_assignment(ParserCtx *ctx);
+static int parse_valdef(ParserCtx *ctx, StmtInfo *info);
+static int parse_vardef(ParserCtx *ctx, StmtInfo *info);
+static int parse_assignment(ParserCtx *ctx, StmtInfo *info);
 static int parse_if_statement(ParserCtx *ctx, int current_indent,
                               StmtInfo *info);
-static int parse_while_statement(ParserCtx *ctx, int current_indent);
+static int parse_while_statement(ParserCtx *ctx, int current_indent, StmtInfo *info);
 static int parse_return_statement(ParserCtx *ctx, StmtInfo *info);
-static int parse_block(ParserCtx *ctx, int current_indent, StmtInfo *out);
+static int parse_block(ParserCtx *ctx, int current_indent, StmtInfo *out,
+                       ASTNode **blk);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
+
+static ExprType expr_from_kw(TokenType t) {
+  switch (t) {
+  case T_KW_INT: return EXPR_TYPE_INT;
+  case T_KW_DOUBLE: return EXPR_TYPE_DOUBLE;
+  case T_KW_STRING: return EXPR_TYPE_STRING;
+  case T_KW_UNIT: return EXPR_TYPE_UNIT;
+  default: return EXPR_TYPE_UNKNOWN;
+  }
+}
+
+static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
+  if (!n) return;
+  if (*tail) (*tail)->next = n; else *head = n;
+  *tail = n;
+}
 
 static Token fetch_token(ParserCtx *ctx) {
   Token t;
@@ -213,7 +233,6 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
     if (ctx->current_token.token_type != T_IDENTIFICATOR &&
         ctx->current_token.token_type != T_CLOSE_BRACKET)
       return ERR_SYNTAX;
-    // stop parsing parameters everything is OK
     if (ctx->current_token.token_type == T_CLOSE_BRACKET) {
       fprintf(stderr, "returning found )\n");
       advance(ctx);
@@ -266,7 +285,6 @@ static int parse_defsingle(ParserCtx *ctx) {
     is_main = true;
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
-    // optional T_EOL before def
     if (ctx->current_token.token_type == T_EOL) {
       advance(ctx);
       TOKEN_CHEK(ctx->current_token)
@@ -312,6 +330,18 @@ static int parse_defsingle(ParserCtx *ctx) {
       return REDEF_FN_VAR_ERR;
   }
 
+  ASTNode *fnode = ast_create_node(AST_FUNC_DEF);
+  fnode->is_main = is_main;
+  fnode->data.func_def.name = strdup(name);
+  ASTNode *ph = NULL, *pt = NULL;
+  for (int i = 0; i < param_count; i++) {
+    ASTNode *p = ast_create_node(AST_IDENTIFIER);
+    p->data.string_val = strdup(params[i].name);
+    p->expr_type = expr_from_kw(params[i].type);
+    list_append(&ph, &pt, p);
+  }
+  fnode->data.func_def.params = ph;
+
   symtable_entry *fentry = symtable_entry_init();
   fentry->function = true;
   fentry->declared = true;
@@ -333,8 +363,8 @@ static int parse_defsingle(ParserCtx *ctx) {
   ctx->ret_type = ret_type;
 
   if (ctx->current_token.token_type == T_EOL) {
-    StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
-    status = parse_block(ctx, 0, &info);
+    StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+    status = parse_block(ctx, 0, &info, &fnode->data.func_def.body);
     if (status == 0) {
       TokenType t = ctx->current_token.token_type;
       if (t == T_ERROR)
@@ -347,9 +377,22 @@ static int parse_defsingle(ParserCtx *ctx) {
         !info.returns &&
         !(info.kind == SK_EXPR && types_compatible(ret_type, info.type)))
       status = STATIC_SEM_TYPE_ERR;
+    if (status == 0 && ret_type == T_ERROR) {
+      if (info.returns) status = STATIC_SEM_TYPE_ERR;
+      else if (info.kind == SK_EXPR) {
+        TokenType inf = kw_from_expr_type(info.type);
+        if (info.type == EXPR_TYPE_BOOL || inf == T_ERROR) status = STATIC_SEM_TYPE_ERR;
+        else fentry->type = inf;
+      } else fentry->type = T_KW_UNIT;
+    }
   } else {
     ExprType body_type = EXPR_TYPE_UNKNOWN;
-    status = parse_expression(ctx, NULL, &body_type);
+    ASTNode *e = NULL;
+    status = parse_expression(ctx, &e, &body_type);
+    if (status == 0) {
+      fnode->data.func_def.body = ast_create_node(AST_BLOCK);
+      fnode->data.func_def.body->data.block.statements = e;
+    }
     if (status == 0 && ctx->current_token.token_type != T_EOL &&
         ctx->current_token.token_type != T_EOF)
       status = (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
@@ -366,14 +409,20 @@ static int parse_defsingle(ParserCtx *ctx) {
     }
   }
 
+  if (status == 0) {
+    fnode->expr_type = expr_from_kw(fentry->type);
+    list_append(&ctx->funcs, &ctx->funcs_tail, fnode);
+  }
+
   ctx->ret_type = T_ERROR;
   smt_scope_remove(&ctx->smt);
   return status;
 }
 
 static int parse_statement_list(ParserCtx *ctx, int current_indent,
-                                StmtInfo *out) {
-  StmtInfo last = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+                                StmtInfo *out, ASTNode **list) {
+  StmtInfo last = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+  ASTNode *head = NULL, *tail = NULL;
   while (true) {
     if (ctx->current_token.token_type == T_EOL ||
         (ctx->current_token.token_type == T_INDENTS &&
@@ -397,23 +446,28 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent,
       break;
     }
 
-    StmtInfo cur = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+    StmtInfo cur = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
     int status = parse_statement(ctx, current_indent, &cur);
     if (status != 0)
       return status;
+    list_append(&head, &tail, cur.node);
     last = cur;
   }
   if (out != NULL)
     *out = last;
+  if (list)
+    *list = head;
   return 0;
 }
 
 static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
   ExprType t = EXPR_TYPE_UNKNOWN;
-  int status = parse_expression(ctx, NULL, &t);
+  ASTNode *ast = NULL;
+  int status = parse_expression(ctx, &ast, &t);
   if (status == 0) {
     info->kind = SK_EXPR;
     info->type = t;
+    info->node = ast;
   }
   return status;
 }
@@ -436,18 +490,18 @@ static int end_of_simple_statement(ParserCtx *ctx, int status) {
 static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   switch (ctx->current_token.token_type) {
   case T_KW_VAL:
-    return end_of_simple_statement(ctx, parse_valdef(ctx));
+    return end_of_simple_statement(ctx, parse_valdef(ctx, info));
   case T_KW_VAR:
-    return end_of_simple_statement(ctx, parse_vardef(ctx));
+    return end_of_simple_statement(ctx, parse_vardef(ctx, info));
   case T_KW_IF:
     return parse_if_statement(ctx, current_indent, info);
   case T_KW_WHILE:
-    return parse_while_statement(ctx, current_indent);
+    return parse_while_statement(ctx, current_indent, info);
   case T_KW_RETURN:
     return end_of_simple_statement(ctx, parse_return_statement(ctx, info));
   case T_IDENTIFICATOR:
     if (peek_token(ctx).token_type == T_ASSIGN)
-      return end_of_simple_statement(ctx, parse_assignment(ctx));
+      return end_of_simple_statement(ctx, parse_assignment(ctx, info));
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
@@ -492,7 +546,7 @@ static bool types_compatible(TokenType declared, ExprType actual) {
   }
 }
 
-static int parse_valdef(ParserCtx *ctx) {
+static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_VAL)) != 0)
     return status;
@@ -527,7 +581,8 @@ static int parse_valdef(ParserCtx *ctx) {
     return status;
 
   ExprType expr_type = EXPR_TYPE_UNKNOWN;
-  if ((status = parse_expression(ctx, NULL, &expr_type)) != 0)
+  ASTNode *init = NULL;
+  if ((status = parse_expression(ctx, &init, &expr_type)) != 0)
     return status;
 
   TokenType var_type;
@@ -547,10 +602,17 @@ static int parse_valdef(ParserCtx *ctx) {
   entry->defined = true;
   entry->value = true;
   smt_insert(&ctx->smt, (char *)name, entry);
+
+  ASTNode *n = ast_create_node(AST_VAR_DECL);
+  n->data.var_assign.identifier = strdup(name);
+  n->data.var_assign.expression = init;
+  n->expr_type = expr_from_kw(var_type);
+  info->node = n;
+
   return 0;
 }
 
-static int parse_vardef(ParserCtx *ctx) {
+static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_VAR)) != 0)
     return status;
@@ -584,7 +646,8 @@ static int parse_vardef(ParserCtx *ctx) {
     return status;
 
   ExprType expr_type = EXPR_TYPE_UNKNOWN;
-  if ((status = parse_expression(ctx, NULL, &expr_type)) != 0)
+  ASTNode *init = NULL;
+  if ((status = parse_expression(ctx, &init, &expr_type)) != 0)
     return status;
 
   TokenType var_type;
@@ -604,32 +667,61 @@ static int parse_vardef(ParserCtx *ctx) {
   entry->defined = true;
   entry->variable = true;
   smt_insert(&ctx->smt, (char *)name, entry);
+
+  ASTNode *n = ast_create_node(AST_VAR_DECL);
+  n->data.var_assign.identifier = strdup(name);
+  n->data.var_assign.expression = init;
+  n->expr_type = expr_from_kw(var_type);
+  info->node = n;
+
   return 0;
 }
 
-static int parse_assignment(ParserCtx *ctx) {
+static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
   int status;
 
   const char *name = ctx->current_token.token_lexeme.lexeme;
+  char *id = strdup(name);
   symtable_entry *entry = NULL;
-  if (!smt_search(&ctx->smt, (char *)name, &entry))
+  if (!smt_search(&ctx->smt, (char *)name, &entry)) {
+    free(id);
     return UNDEF_FN_ERR;
-  if (entry->function)
+  }
+  if (entry->function) {
+    free(id);
     return STATIC_SEM_TYPE_ERR;
-  if (!entry->variable)
+  }
+  if (!entry->variable) {
+    free(id);
     return WRITE_ERR;
+  }
 
-  if ((status = match(ctx, T_IDENTIFICATOR)) != 0)
+  if ((status = match(ctx, T_IDENTIFICATOR)) != 0) {
+    free(id);
     return status;
-  if ((status = match(ctx, T_ASSIGN)) != 0)
+  }
+  if ((status = match(ctx, T_ASSIGN)) != 0) {
+    free(id);
     return status;
+  }
 
   ExprType expr_type = EXPR_TYPE_UNKNOWN;
-  if ((status = parse_expression(ctx, NULL, &expr_type)) != 0)
+  ASTNode *rhs = NULL;
+  if ((status = parse_expression(ctx, &rhs, &expr_type)) != 0) {
+    free(id);
     return status;
+  }
 
-  if (expr_type == EXPR_TYPE_BOOL || !types_compatible(entry->type, expr_type))
+  if (expr_type == EXPR_TYPE_BOOL || !types_compatible(entry->type, expr_type)) {
+    free(id);
     return STATIC_SEM_TYPE_ERR;
+  }
+
+  ASTNode *n = ast_create_node(AST_ASSIGNMENT);
+  n->data.var_assign.identifier = id;
+  n->data.var_assign.expression = rhs;
+  n->expr_type = expr_from_kw(entry->type);
+  info->node = n;
 
   return 0;
 }
@@ -641,6 +733,10 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   info->kind = SK_RETURN;
   info->returns = true;
 
+  ASTNode *rn = ast_create_node(AST_RETURN);
+  rn->data.return_stmt.expression = NULL;
+  info->node = rn;
+
   TokenType next = ctx->current_token.token_type;
   TOKEN_CHEK(ctx->current_token)
   if (next == T_EOL || next == T_EOF || next == T_SEMICOLON) {
@@ -650,7 +746,7 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   }
 
   ExprType expr_type = EXPR_TYPE_UNKNOWN;
-  if ((status = parse_expression(ctx, NULL, &expr_type)) != 0)
+  if ((status = parse_expression(ctx, &rn->data.return_stmt.expression, &expr_type)) != 0)
     return status;
 
   if (ctx->ret_type == T_ERROR)
@@ -661,9 +757,9 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
-static int parse_condition(ParserCtx *ctx, TokenType terminator) {
+static int parse_condition(ParserCtx *ctx, TokenType terminator, ASTNode **cond) {
   ExprType type = EXPR_TYPE_UNKNOWN;
-  int status = parse_expression(ctx, NULL, &type);
+  int status = parse_expression(ctx, cond, &type);
   if (status != 0)
     return status;
   if (ctx->current_token.token_type != terminator)
@@ -676,18 +772,21 @@ static int parse_condition(ParserCtx *ctx, TokenType terminator) {
 static int parse_if_statement(ParserCtx *ctx, int current_indent,
                               StmtInfo *info) {
   int status;
-  StmtInfo then_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
-  StmtInfo else_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false};
+  StmtInfo then_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+  StmtInfo else_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
   if ((status = match(ctx, T_KW_IF)) != 0)
     return status;
 
-  if ((status = parse_condition(ctx, T_KW_THEN)) != 0)
+  ASTNode *n = ast_create_node(AST_IF);
+  n->data.if_stmt.else_body = NULL;
+
+  if ((status = parse_condition(ctx, T_KW_THEN, &n->data.if_stmt.condition)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_THEN)) != 0)
     return status;
 
-  if ((status = parse_block(ctx, current_indent, &then_info)) != 0)
+  if ((status = parse_block(ctx, current_indent, &then_info, &n->data.if_stmt.body)) != 0)
     return status;
 
   while (ctx->current_token.token_type == T_EOL)
@@ -697,30 +796,36 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
     return ERR_SYNTAX;
   if ((status = match(ctx, T_KW_ELSE)) != 0)
     return status;
-  if ((status = parse_block(ctx, current_indent, &else_info)) != 0)
+  if ((status = parse_block(ctx, current_indent, &else_info, &n->data.if_stmt.else_body)) != 0)
     return status;
 
   info->kind = SK_IF;
   info->returns = then_info.returns && else_info.returns;
+  info->node = n;
   return 0;
 }
 
-static int parse_while_statement(ParserCtx *ctx, int current_indent) {
+static int parse_while_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_WHILE)) != 0)
     return status;
 
-  if ((status = parse_condition(ctx, T_KW_DO)) != 0)
+  ASTNode *n = ast_create_node(AST_WHILE);
+
+  if ((status = parse_condition(ctx, T_KW_DO, &n->data.while_loop.condition)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_DO)) != 0)
     return status;
 
-  return parse_block(ctx, current_indent, NULL);
+  status = parse_block(ctx, current_indent, NULL, &n->data.while_loop.body);
+  if (status == 0)
+    info->node = n;
+  return status;
 }
 
-// Upravit block aby řešil tabulatory (začátek řádku x někde jinde)
-static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out) {
+static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out,
+                       ASTNode **blk) {
   int status;
 
   if ((status = match(ctx, T_EOL)) != 0)
@@ -738,8 +843,13 @@ static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out) {
   int block_indent = ctx->current_token.token_indents.count;
   advance(ctx);
 
+  ASTNode *lst = NULL;
   smt_scope_add(&ctx->smt);
-  status = parse_statement_list(ctx, block_indent, out);
+  status = parse_statement_list(ctx, block_indent, out, &lst);
   smt_scope_remove(&ctx->smt);
+  if (status == 0 && blk) {
+    *blk = ast_create_node(AST_BLOCK);
+    (*blk)->data.block.statements = lst;
+  }
   return status;
 }

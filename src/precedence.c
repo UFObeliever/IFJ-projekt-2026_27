@@ -322,9 +322,15 @@ static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
       return SYN_ANAL_ERR;
     if (t != EXPR_TYPE_UNKNOWN && !is_numeric(t))
       return STATIC_SEM_TYPE_ERR;
+    //ja upraveno
+    ASTNode *u = ast_make_unary(T_MINUS_SIGN, n);
+    if (u) u->expr_type = t;
+    if (!tstack_push(ts, t) || !ast_stack_push(as, u))
+      return COMPILER_ERR;
+    /*
     if (!tstack_push(ts, t) ||
         !ast_stack_push(as, ast_make_unary(T_MINUS_SIGN, n)))
-      return COMPILER_ERR;
+      return COMPILER_ERR;*/
   }
   return SUCCESS;
 }
@@ -340,7 +346,7 @@ static ExprType int_or_double(ExprType l, ExprType r) {
 }
 
 Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
-  ExprType right_type, left_type;
+  ExprType right_type = EXPR_TYPE_UNKNOWN, left_type = EXPR_TYPE_UNKNOWN;
   ASTNode *right_node, *left_node;
   fprintf(stderr, "[DEBUG] apply_operator called for operator token %d\n", op);
 
@@ -425,9 +431,11 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   }
 
   ASTNode *binop_node = ast_make_binop(op, left_node, right_node);
+  // ja pridano radek 438
   if (!ast_stack_push(ast_stack, binop_node)) {
     return COMPILER_ERR;
   }
+  binop_node->expr_type = result;
 
   return SUCCESS;
 }
@@ -477,6 +485,7 @@ náročnejší
 
   int argc = 0;
   Error deferred = SUCCESS;
+  ASTNode *head = NULL, *tail = NULL; //ja
   skip_eols(parser);
 
   if (parser->current_token.token_type == T_ERROR)
@@ -486,13 +495,23 @@ náročnejší
   } else {
     while (true) {
       ExprType at = EXPR_TYPE_UNKNOWN;
-      Error err = parse_expression(parser, NULL, &at);
+      // ja 
+      ASTNode *arg = NULL;
+      Error err = parse_expression(parser, &arg, &at);
+      if (err != SUCCESS) return err;
+      if (tail) tail->next = arg; else head = arg;
+      tail = arg;
+      if (argc >= fn->f_param_count ||
+          !arg_type_ok(fn->f_params[argc].type, at))
+        deferred = STATIC_SEM_ERR;
+      argc++;
+      /*Error err = parse_expression(parser, NULL, &at);
       if (err != SUCCESS)
         return err;
       if (argc >= fn->f_param_count ||
           !arg_type_ok(fn->f_params[argc].type, at))
         deferred = STATIC_SEM_ERR;
-      argc++;
+      argc++;*/
 
       skip_eols(parser);
 
@@ -534,10 +553,19 @@ náročnejší
   ASTNode *node = ast_create_node(AST_FUNC_CALL);
   if (node != NULL) {
     node->data.func_call.name = strdup(name);
-    node->data.func_call.arguments = NULL;
+    node->data.func_call.arguments = head;     // bylo NULL
+    node->expr_type = *out_type;
   }
   *out_node = node;
   return SUCCESS;
+}
+//ja
+static char *strip_us(const char *s) {
+  char *r = malloc(strlen(s) + 1), *p = r;
+  if (!r) return NULL;
+  for (; *s; s++) if (*s != '_') *p++ = *s;
+  *p = 0;
+  return r;
 }
 
 static Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
@@ -628,14 +656,20 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
 
         leaf = ast_create_node(AST_IDENTIFIER);
         leaf->data.string_val = strdup((char *)lookahead.token_lexeme.lexeme);
-      } else if (lookahead.token_type == T_INT_LITERAL) {
-        leaf = ast_make_int(atoi((char *)lookahead.token_lexeme.lexeme));
+            } else if (lookahead.token_type == T_INT_LITERAL) {
+        char *c = strip_us(lookahead.token_lexeme.lexeme);
+        leaf = ast_make_int(c ? atoi(c) : 0);
+        free(c);
+      } else if (lookahead.token_type == T_DOUBLE_LITERAL) {
+        char *c = strip_us(lookahead.token_lexeme.lexeme);
+        leaf = ast_make_double(c ? strtod(c, NULL) : 0.0);
+        free(c);
       } else if (lookahead.token_type == T_STRING_LITERAL) {
         leaf = ast_make_string(strdup((char *)lookahead.token_lexeme.lexeme));
       } else {
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
-
+      if (leaf) leaf->expr_type = t; //ja
       if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }
@@ -670,6 +704,8 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
 
           ExprType t = EXPR_TYPE_UNIT;
           ASTNode *unit_node = ast_create_node(AST_LITERAL_UNIT);
+
+          unit_node->expr_type = EXPR_TYPE_UNIT; // ja
 
           if (!tstack_push(&tstack, t) ||
               !ast_stack_push(&ast_stack, unit_node)) {
