@@ -5,9 +5,15 @@
 #include <stdio.h>
 
 /**
- * Vygeneruje IFJcode26 z AST (kořen = AST_PROGRAM, funkce v
- * data.block.statements) a vypíše ho do `out`.
- * Při chybě se nevypíše nic. Vrací SUCCESS / UNDEF_FN_ERR / COMPILER_ERR.
+ * @brief Vygeneruje program v IFJcode26 z AST a vypíše ho do souboru
+ *
+ * Kód se nejdřív celý složí v paměti a zapíše se až po úspěšném průchodu AST,
+ * takže při chybě nevznikne žádný částečný výstup.
+ *
+ * @param root: kořen AST (AST_PROGRAM), definice funkcí jsou v data.block.statements
+ * @param out: soubor, do kterého se kód zapíše (stdout)
+ * @return SUCCESS, UNDEF_FN_ERR pokud chybí funkce s anotací @main,
+ *         COMPILER_ERR při interní chybě generátoru
  */
 int generate_program(ASTNode *root, FILE *out);
 

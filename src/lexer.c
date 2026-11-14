@@ -339,10 +339,14 @@ Token lex_numbers(LexerCtx *ctx) {
         ungetc(c, ctx->input);
         return MAKE_TOKEN_ERROR();
       }
+      break;
 
     case S_DOT_DOUBLE:
       if (isdigit(c)) {
         sb_append_char(&ctx->Buffer, input_char);
+      } else if (c == '_') {                          // <-- NOVÉ
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOUBLE_UNDERSCORE_AFTER_DOT;
       } else if (c == 'e' || c == 'E') {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_E;
@@ -353,6 +357,15 @@ Token lex_numbers(LexerCtx *ctx) {
         ungetc(c, ctx->input);
         DEBUG_LOG("putting char back %c (%d)\n", (char)c, c);
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->Buffer);
+      }
+      break;
+
+    case S_DOUBLE_UNDERSCORE_AFTER_DOT:
+      if (isdigit(c)) {
+        sb_append_char(&ctx->Buffer, input_char);
+        current_state = S_DOT_DOUBLE;
+      } else {
+        return MAKE_TOKEN_ERROR();
       }
       break;
     default:
