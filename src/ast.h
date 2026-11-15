@@ -25,11 +25,11 @@ typedef enum {
 
 typedef struct ASTNode {
   ASTNodeType type;
-  // ja pridane 
-  int expr_type;   // hodnota ExprType (EXPR_TYPE_*); u FUNC_DEF návratový typ,
-                   // u VAR_DECL/ASSIGNMENT/parametru typ proměnné
-  bool is_main;    // jen AST_FUNC_DEF
-  //ja pridane
+  // ja pridane
+  int expr_type; // hodnota ExprType (EXPR_TYPE_*); u FUNC_DEF návratový typ,
+                 // u VAR_DECL/ASSIGNMENT/parametru typ proměnné
+  bool is_main;  // jen AST_FUNC_DEF
+  // ja pridane
   struct ASTNode *next;
 
   union {

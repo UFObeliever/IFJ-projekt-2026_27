@@ -23,21 +23,19 @@ typedef struct {
 static void tstack_init(TypeStack *s) { s->top = -1; }
 static bool tstack_push(TypeStack *s, ExprType t) {
   if (s->top >= TYPE_STACK_MAX - 1) {
-    fprintf(stderr, "[DEBUG] tstack_push overflow!\n");
+    DEBUG_LOG("[DEBUG] tstack_push overflow!\n");
     return false;
   }
-  fprintf(stderr, "[DEBUG] tstack_push: pushed type %d, new top = %d\n", t,
-          s->top);
+  DEBUG_LOG("[DEBUG] tstack_push: pushed type %d, new top = %d\n", t, s->top);
   s->items[++s->top] = t;
   return true;
 }
 static bool tstack_pop(TypeStack *s, ExprType *out) {
   if (s->top < 0) {
-    fprintf(stderr, "[DEBUG] tstack_pop underflow!\n");
+    DEBUG_LOG("[DEBUG] tstack_pop underflow!\n");
     return false;
   }
-  fprintf(stderr, "[DEBUG] tstack_pop: popped type %d, new top = %d\n", *out,
-          s->top);
+  DEBUG_LOG("[DEBUG] tstack_pop: popped type %d, new top = %d\n", *out, s->top);
   *out = s->items[s->top--];
   return true;
 }
@@ -69,27 +67,27 @@ static bool ast_stack_pop(ASTStack *s, ASTNode **out) {
 
 static void stack_clear(PrecedenceStack *s) {
   s->top = -1;
-  fprintf(stderr, "[DEBUG] precedence stack cleared\n");
+  DEBUG_LOG("[DEBUG] precedence stack cleared\n");
 }
 
 static bool stack_push(PrecedenceStack *s, TokenType t) {
   if (s->top >= PREC_STACK_MAX - 1) {
-    fprintf(stderr, "[DEBUG] precedence stack overflow!\n");
+    DEBUG_LOG("[DEBUG] precedence stack overflow!\n");
     return false;
   }
-  fprintf(stderr, "[DEBUG] stack_push: token %d pushed, new stack top = %d\n",
-          t, s->top);
+  DEBUG_LOG("[DEBUG] stack_push: token %d pushed, new stack top = %d\n", t,
+            s->top);
   s->items[++s->top] = t;
   return true;
 }
 
 static bool stack_pop(PrecedenceStack *s) {
   if (s->top < 0) {
-    fprintf(stderr, "[DEBUG] precedence stack underflow on pop!\n");
+    DEBUG_LOG("[DEBUG] precedence stack underflow on pop!\n");
     return false;
   }
-  fprintf(stderr, "[DEBUG] stack_pop: removing token %d from top = %d\n",
-          s->items[s->top], s->top);
+  DEBUG_LOG("[DEBUG] stack_pop: removing token %d from top = %d\n",
+            s->items[s->top], s->top);
   s->top--;
   return true;
 }
@@ -198,25 +196,22 @@ static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
   symtable_entry *entry = NULL;
 
   if (!smt_search(&parser->smt, (char *)token->token_lexeme.lexeme, &entry)) {
-    fprintf(stderr,
-            "[DEBUG] check_identifier_in_expr1: identifier '%s' not found "
-            "(UNDEF_FN_ERR)\n",
-            (char *)token->token_lexeme.lexeme);
+    DEBUG_LOG("[DEBUG] check_identifier_in_expr1: identifier '%s' not found "
+              "(UNDEF_FN_ERR)\n",
+              (char *)token->token_lexeme.lexeme);
     return UNDEF_FN_ERR;
   }
   if (entry->function) {
-    fprintf(stderr,
-            "[DEBUG] check_identifier_in_expr2: identifier '%s' not found "
-            "(UNDEF_FN_ERR)\n",
-            (char *)token->token_lexeme.lexeme);
+    DEBUG_LOG("[DEBUG] check_identifier_in_expr2: identifier '%s' not found "
+              "(UNDEF_FN_ERR)\n",
+              (char *)token->token_lexeme.lexeme);
     return STATIC_SEM_TYPE_ERR;
   }
 
   *type = expr_type_from_kw(entry->type);
-  fprintf(stderr,
-          "[DEBUG] check_identifier_in_expr3: identifier '%s' not found "
-          "(UNDEF_FN_ERR)\n",
-          (char *)token->token_lexeme.lexeme);
+  DEBUG_LOG("[DEBUG] check_identifier_in_expr3: identifier '%s' not found "
+            "(UNDEF_FN_ERR)\n",
+            (char *)token->token_lexeme.lexeme);
   return SUCCESS;
 }
 
@@ -322,9 +317,10 @@ static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
       return SYN_ANAL_ERR;
     if (t != EXPR_TYPE_UNKNOWN && !is_numeric(t))
       return STATIC_SEM_TYPE_ERR;
-    //ja upraveno
+    // ja upraveno
     ASTNode *u = ast_make_unary(T_MINUS_SIGN, n);
-    if (u) u->expr_type = t;
+    if (u)
+      u->expr_type = t;
     if (!tstack_push(ts, t) || !ast_stack_push(as, u))
       return COMPILER_ERR;
     /*
@@ -348,17 +344,15 @@ static ExprType int_or_double(ExprType l, ExprType r) {
 Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   ExprType right_type = EXPR_TYPE_UNKNOWN, left_type = EXPR_TYPE_UNKNOWN;
   ASTNode *right_node, *left_node;
-  fprintf(stderr, "[DEBUG] apply_operator called for operator token %d\n", op);
+  DEBUG_LOG("[DEBUG] apply_operator called for operator token %d\n", op);
 
   if (!tstack_pop(tstack, &right_type) || !tstack_pop(tstack, &left_type)) {
-    fprintf(stderr,
-            "[DEBUG] apply_operator: tstack_pop failed (SYN_ANAL_ERR)\n");
+    DEBUG_LOG("[DEBUG] apply_operator: tstack_pop failed (SYN_ANAL_ERR)\n");
     return SYN_ANAL_ERR;
   }
   if (!ast_stack_pop(ast_stack, &right_node) ||
       !ast_stack_pop(ast_stack, &left_node)) {
-    fprintf(stderr,
-            "[DEBUG] apply_operator: ast_stack_pop failed (SYN_ANAL_ERR)\n");
+    DEBUG_LOG("[DEBUG] apply_operator: ast_stack_pop failed (SYN_ANAL_ERR)\n");
     return SYN_ANAL_ERR;
   }
 
@@ -374,8 +368,7 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
     else if (left_type == EXPR_TYPE_STRING && right_type == EXPR_TYPE_STRING)
       result = EXPR_TYPE_STRING;
     else if (known) {
-      fprintf(
-          stderr,
+      DEBUG_LOG(
           "[DEBUG] apply_operator (+) type mismatch (STATIC_SEM_TYPE_ERR)\n");
       return STATIC_SEM_TYPE_ERR;
     }
@@ -386,8 +379,8 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
     if (is_numeric(left_type) && is_numeric(right_type))
       result = int_or_double(left_type, right_type);
     else if (known) {
-      fprintf(stderr, "[DEBUG] apply_operator (arithmetic) type mismatch "
-                      "(STATIC_SEM_TYPE_ERR)\n");
+      DEBUG_LOG("[DEBUG] apply_operator (arithmetic) type mismatch "
+                "(STATIC_SEM_TYPE_ERR)\n");
       return STATIC_SEM_TYPE_ERR;
     }
     break;
@@ -400,8 +393,8 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
       bool both_str =
           left_type == EXPR_TYPE_STRING && right_type == EXPR_TYPE_STRING;
       if (!both_num && !both_str) {
-        fprintf(stderr, "[DEBUG] apply_operator (relational) type mismatch "
-                        "(STATIC_SEM_TYPE_ERR)\n");
+        DEBUG_LOG("[DEBUG] apply_operator (relational) type mismatch "
+                  "(STATIC_SEM_TYPE_ERR)\n");
         return STATIC_SEM_TYPE_ERR;
       }
     }
@@ -412,8 +405,8 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
     if (known) {
       bool both_num = is_numeric(left_type) && is_numeric(right_type);
       if (!both_num && left_type != right_type) {
-        fprintf(stderr, "[DEBUG] apply_operator (equality) type mismatch "
-                        "(STATIC_SEM_TYPE_ERR)\n");
+        DEBUG_LOG("[DEBUG] apply_operator (equality) type mismatch "
+                  "(STATIC_SEM_TYPE_ERR)\n");
         return STATIC_SEM_TYPE_ERR;
       }
     }
@@ -424,7 +417,7 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
     break;
   }
 
-  fprintf(stderr, "[DEBUG] apply_operator result type = %d\n", result);
+  DEBUG_LOG("[DEBUG] apply_operator result type = %d\n", result);
 
   if (!tstack_push(tstack, result)) {
     return COMPILER_ERR;
@@ -469,7 +462,7 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
   const char *name = parser->current_token.token_lexeme.lexeme;
   symtable_entry *fn = NULL;
   if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function) {
-    fprintf(stderr, "DEBUG: lexeme not found!: %s\n", name);
+    DEBUG_LOG("DEBUG: lexeme not found!: %s\n", name);
     return UNDEF_FN_ERR;
 
     /*
@@ -485,7 +478,7 @@ náročnejší
 
   int argc = 0;
   Error deferred = SUCCESS;
-  ASTNode *head = NULL, *tail = NULL; //ja
+  ASTNode *head = NULL, *tail = NULL; // ja
   skip_eols(parser);
 
   if (parser->current_token.token_type == T_ERROR)
@@ -495,11 +488,15 @@ náročnejší
   } else {
     while (true) {
       ExprType at = EXPR_TYPE_UNKNOWN;
-      // ja 
+      // ja
       ASTNode *arg = NULL;
       Error err = parse_expression(parser, &arg, &at);
-      if (err != SUCCESS) return err;
-      if (tail) tail->next = arg; else head = arg;
+      if (err != SUCCESS)
+        return err;
+      if (tail)
+        tail->next = arg;
+      else
+        head = arg;
       tail = arg;
       if (argc >= fn->f_param_count ||
           !arg_type_ok(fn->f_params[argc].type, at))
@@ -553,17 +550,20 @@ náročnejší
   ASTNode *node = ast_create_node(AST_FUNC_CALL);
   if (node != NULL) {
     node->data.func_call.name = strdup(name);
-    node->data.func_call.arguments = head;     // bylo NULL
+    node->data.func_call.arguments = head; // bylo NULL
     node->expr_type = *out_type;
   }
   *out_node = node;
   return SUCCESS;
 }
-//ja
+// ja
 static char *strip_us(const char *s) {
   char *r = malloc(strlen(s) + 1), *p = r;
-  if (!r) return NULL;
-  for (; *s; s++) if (*s != '_') *p++ = *s;
+  if (!r)
+    return NULL;
+  for (; *s; s++)
+    if (*s != '_')
+      *p++ = *s;
   *p = 0;
   return r;
 }
@@ -581,7 +581,7 @@ Error parse_expression(ParserCtx *parser, ASTNode **out_ast,
 
 Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
                             ExprType *out_type) {
-  fprintf(stderr, "[DEBUG] === parse_expression START ===\n");
+  DEBUG_LOG("[DEBUG] === parse_expression START ===\n");
   stack_clear(&parser->stack);
 
   TypeStack tstack;
@@ -596,17 +596,16 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
 
   Token lookahead = look_next_eol(parser);
 
-  fprintf(stderr, "[DEBUG] initial lookahead token_type = %d\n",
-          lookahead.token_type);
+  DEBUG_LOG("[DEBUG] initial lookahead token_type = %d\n",
+            lookahead.token_type);
 
   while (true) {
     if (lookahead.token_type == T_ERROR)
       return LEX_ANAL_ERR;
-    fprintf(stderr,
-            "[DEBUG] loop iteration: lookahead token_type = %d, expect_operand "
-            "= %d, BRACKET_depth = %d, stack_top = %d\n",
-            lookahead.token_type, expect_operand, BRACKET_depth,
-            parser->stack.top);
+    DEBUG_LOG(
+        "[DEBUG] loop iteration: lookahead token_type = %d, expect_operand "
+        "= %d, BRACKET_depth = %d, stack_top = %d\n",
+        lookahead.token_type, expect_operand, BRACKET_depth, parser->stack.top);
     if (lookahead.token_type == T_EOL && BRACKET_depth > 0) {
       CONSUME_TOKEN_GUARD(parser);
       lookahead = look_next_eol(parser);
@@ -629,17 +628,15 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
     }
 
     if (is_end_token) {
-      fprintf(stderr,
-              "[DEBUG] reached end token at depth 0, expect_operand = %d\n",
-              expect_operand);
+      DEBUG_LOG("[DEBUG] reached end token at depth 0, expect_operand = %d\n",
+                expect_operand);
       if (expect_operand)
         return SYN_ANAL_ERR;
       break;
     }
 
     if (is_operand_token(lookahead.token_type) && expect_operand) {
-      fprintf(stderr, "[DEBUG] branch: OPERAND token %d\n",
-              lookahead.token_type);
+      DEBUG_LOG("[DEBUG] branch: OPERAND token %d\n", lookahead.token_type);
       ASTNode *leaf = NULL;
       ExprType t = expr_type_from_token(lookahead.token_type);
       bool is_call = lookahead.token_type == T_IDENTIFICATOR &&
@@ -656,7 +653,7 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
 
         leaf = ast_create_node(AST_IDENTIFIER);
         leaf->data.string_val = strdup((char *)lookahead.token_lexeme.lexeme);
-            } else if (lookahead.token_type == T_INT_LITERAL) {
+      } else if (lookahead.token_type == T_INT_LITERAL) {
         char *c = strip_us(lookahead.token_lexeme.lexeme);
         leaf = ast_make_int(c ? atoi(c) : 0);
         free(c);
@@ -669,7 +666,8 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       } else {
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
-      if (leaf) leaf->expr_type = t; //ja
+      if (leaf)
+        leaf->expr_type = t; // ja
       if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }
@@ -682,23 +680,23 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         return uerr;
 
     } else if (is_open_BRACKET(lookahead.token_type) && expect_operand) {
-      fprintf(stderr, "[DEBUG] branch: OPEN BRACKET (\n");
+      DEBUG_LOG("[DEBUG] branch: OPEN BRACKET (\n");
       stack_push(&parser->stack, lookahead.token_type);
       CONSUME_TOKEN_GUARD(parser);
       BRACKET_depth++;
 
     } else if (lookahead.token_type == T_MINUS_SIGN && expect_operand) {
-      fprintf(stderr, "[DEBUG] branch: UNARY MINUS\n");
+      DEBUG_LOG("[DEBUG] branch: UNARY MINUS\n");
       stack_push(&parser->stack, T_UNARY_MINUS_MARK);
       CONSUME_TOKEN_GUARD(parser);
 
     } else if (is_close_BRACKET(lookahead.token_type)) {
-      fprintf(stderr, "[DEBUG] branch: CLOSE BRACKET ), expect_operand = %d\n",
-              expect_operand);
+      DEBUG_LOG("[DEBUG] branch: CLOSE BRACKET ), expect_operand = %d\n",
+                expect_operand);
       if (expect_operand) {
         if (parser->stack.top >= 0 &&
             is_open_BRACKET(parser->stack.items[parser->stack.top])) {
-          fprintf(stderr, "[DEBUG] found empty brackets ()\n");
+          DEBUG_LOG("[DEBUG] found empty brackets ()\n");
           stack_pop(&parser->stack);
           BRACKET_depth--;
 
@@ -717,18 +715,18 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
           if (uerr != SUCCESS)
             return uerr;
         } else {
-          fprintf(stderr, "[DEBUG] empty bracket check failed, stack top "
-                          "mismatch (SYN_ANAL_ERR)\n");
+          DEBUG_LOG("[DEBUG] empty bracket check failed, stack top "
+                    "mismatch (SYN_ANAL_ERR)\n");
           return SYN_ANAL_ERR;
         }
       } else {
         bool found = false;
         while (parser->stack.top >= 0) {
           TokenType top = parser->stack.items[parser->stack.top];
-          fprintf(stderr,
-                  "[DEBUG] closing bracket cleanup loop: inspecting stack top "
-                  "token = %d\n",
-                  top);
+          DEBUG_LOG(
+              "[DEBUG] closing bracket cleanup loop: inspecting stack top "
+              "token = %d\n",
+              top);
           if (is_open_BRACKET(top)) {
             found = true;
             stack_pop(&parser->stack);
@@ -740,15 +738,14 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
             if (err != SUCCESS)
               return err;
           } else {
-            fprintf(
-                stderr,
+            DEBUG_LOG(
                 "[DEBUG] unexpected token in bracket cleanup (SYN_ANAL_ERR)\n");
             return SYN_ANAL_ERR;
           }
         }
         if (!found) {
-          fprintf(stderr, "[DEBUG] open bracket not found for closing bracket "
-                          "(SYN_ANAL_ERR)\n");
+          DEBUG_LOG("[DEBUG] open bracket not found for closing bracket "
+                    "(SYN_ANAL_ERR)\n");
           return SYN_ANAL_ERR;
         }
         CONSUME_TOKEN_GUARD(parser);
@@ -759,16 +756,15 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       }
     } else if (is_operator_token(lookahead.token_type) && !expect_operand) {
       TokenType next = lookahead.token_type;
-      fprintf(stderr, "[DEBUG] branch: OPERATOR token %d\n", next);
+      DEBUG_LOG("[DEBUG] branch: OPERATOR token %d\n", next);
       bool pushed = false;
       while (!pushed) {
         TokenType top = top_terminal(&parser->stack);
-        fprintf(
-            stderr,
+        DEBUG_LOG(
             "[DEBUG] precedence loop: top terminal = %d, next operator = %d\n",
             top, next);
         if (top == T_EOF) {
-          fprintf(stderr, "[DEBUG] top terminal is T_EOF, shifting operator\n");
+          DEBUG_LOG("[DEBUG] top terminal is T_EOF, shifting operator\n");
           stack_push(&parser->stack, next);
           CONSUME_TOKEN_GUARD(parser);
           expect_operand = true;

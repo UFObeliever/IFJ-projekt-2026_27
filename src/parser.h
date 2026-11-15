@@ -1,9 +1,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "ast.h"
 #include "lexer.h"
 #include "symtable.h"
-#include "ast.h"
 
 typedef struct {
   TokenType items[1024];
@@ -21,7 +21,7 @@ typedef struct ParserCtx {
   bool has_peek;
   int line_indent;
   bool at_bol;
-  ASTNode *funcs;        // ja radek 24 25
+  ASTNode *funcs; // ja radek 24 25
   ASTNode *funcs_tail;
 } ParserCtx;
 

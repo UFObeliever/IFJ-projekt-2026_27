@@ -72,14 +72,6 @@
 #define MAKE_TOKEN_TAB()                                                       \
   (Token) { .token_type = (T_TAB) }
 
-#ifdef NDEBUG
-#define DEBUG_LOG(fmt, ...) ((void)0)
-#else
-#define DEBUG_LOG(fmt, ...)                                                    \
-  fprintf(stderr, "[%s:%d](%s)", __FILE__, __LINE__, __func__);                \
-  fprintf(stderr, fmt, ##__VA_ARGS__);
-#endif
-
 void lexer_init(LexerCtx *ctx, FILE *input) {
   ctx->input = input;
   sb_init(&ctx->Buffer, 16);
@@ -344,7 +336,7 @@ Token lex_numbers(LexerCtx *ctx) {
     case S_DOT_DOUBLE:
       if (isdigit(c)) {
         sb_append_char(&ctx->Buffer, input_char);
-      } else if (c == '_') {                          // <-- NOVÉ
+      } else if (c == '_') { // <-- NOVÉ
         sb_append_char(&ctx->Buffer, input_char);
         current_state = S_DOUBLE_UNDERSCORE_AFTER_DOT;
       } else if (c == 'e' || c == 'E') {

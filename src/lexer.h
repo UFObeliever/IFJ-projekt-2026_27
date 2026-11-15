@@ -198,5 +198,11 @@ Token lex_not_equal(LexerCtx *ctx);
 void print_token(const Token *token);
 
 Token lex_main_func(LexerCtx *ctx);
-
+#ifdef NDEBUG
+#define DEBUG_LOG(fmt, ...) ((void)0)
+#else
+#define DEBUG_LOG(fmt, ...)                                                    \
+  fprintf(stderr, "[%s:%d](%s)", __FILE__, __LINE__, __func__);                \
+  fprintf(stderr, fmt, ##__VA_ARGS__);
+#endif
 #endif

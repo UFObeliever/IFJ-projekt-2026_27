@@ -10,7 +10,8 @@
  * Kód se nejdřív celý složí v paměti a zapíše se až po úspěšném průchodu AST,
  * takže při chybě nevznikne žádný částečný výstup.
  *
- * @param root: kořen AST (AST_PROGRAM), definice funkcí jsou v data.block.statements
+ * @param root: kořen AST (AST_PROGRAM), definice funkcí jsou v
+ * data.block.statements
  * @param out: soubor, do kterého se kód zapíše (stdout)
  * @return SUCCESS, UNDEF_FN_ERR pokud chybí funkce s anotací @main,
  *         COMPILER_ERR při interní chybě generátoru

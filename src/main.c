@@ -1,7 +1,7 @@
+#include "ast.h"
+#include "generator.h"
 #include "lexer.h"
 #include "parser.h"
-#include "generator.h"
-#include "ast.h"
 #include <stdio.h>
 int main(void) {
   LexerCtx lexer_ctx;
