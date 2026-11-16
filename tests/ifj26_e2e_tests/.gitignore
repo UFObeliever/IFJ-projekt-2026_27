@@ -1,3 +1,5 @@
 /**/*.code
 fails
 __pycache__
+!*.out
+!*.in
