@@ -57,6 +57,8 @@ static bool types_compatible(TokenType declared, ExprType actual);
 static Token raw_token(ParserCtx *ctx, size_t idx); // added for SCIENCE!!!
 
 static ExprType expr_from_kw(TokenType t) {
+  if (t == T_TYPE_BOOLEAN)
+    return EXPR_TYPE_BOOL;
   switch (t) {
   case T_KW_INT:
     return EXPR_TYPE_INT;
@@ -272,6 +274,13 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
     return 0;
+  case T_IDENTIFICATOR:
+    if (strcmp(ctx->current_token.token_lexeme.lexeme, "Boolean") != 0)
+      return ERR_SYNTAX;
+    *out = T_TYPE_BOOLEAN;
+    advance(ctx);
+    TOKEN_CHEK(ctx->current_token)
+    return 0;
   default:
     fprintf(stderr, "error: unknown type was returned!!");
     return ERR_SYNTAX;
@@ -469,7 +478,7 @@ static int analyze_function(ParserCtx *ctx, const char *name,
         status = STATIC_SEM_TYPE_ERR;
       else if (info.kind == SK_EXPR) {
         TokenType inf = kw_from_expr_type(info.type);
-        if (info.type == EXPR_TYPE_BOOL || inf == T_ERROR)
+        if (inf == T_ERROR)
           status = STATIC_SEM_TYPE_ERR;
         else
           fentry->type = inf;
@@ -493,7 +502,7 @@ static int analyze_function(ParserCtx *ctx, const char *name,
       status = STATIC_SEM_TYPE_ERR;
     if (status == 0 && ret_type == T_ERROR) {
       TokenType inferred = kw_from_expr_type(body_type);
-      if (body_type == EXPR_TYPE_BOOL || inferred == T_ERROR)
+      if (inferred == T_ERROR)
         status = STATIC_SEM_TYPE_ERR;
       else
         fentry->type = inferred;
@@ -722,6 +731,8 @@ static TokenType kw_from_expr_type(ExprType t) {
     return T_KW_STRING;
   case EXPR_TYPE_UNIT:
     return T_KW_UNIT;
+  case EXPR_TYPE_BOOL:
+    return T_TYPE_BOOLEAN;
   default:
     return T_ERROR;
   }
@@ -731,6 +742,8 @@ static bool types_compatible(TokenType declared, ExprType actual) {
   if (actual == EXPR_TYPE_UNKNOWN) {
     return true;
   }
+  if (declared == T_TYPE_BOOLEAN)
+    return actual == EXPR_TYPE_BOOL;
   switch (declared) {
   case T_KW_INT:
     return actual == EXPR_TYPE_INT;
@@ -761,19 +774,9 @@ static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
-    switch (ctx->current_token.token_type) {
-    case T_KW_INT:
-    case T_KW_DOUBLE:
-    case T_KW_STRING:
-    case T_KW_UNIT:
-      declared = ctx->current_token.token_type;
-      has_type = true;
-      advance(ctx);
-      TOKEN_CHEK(ctx->current_token)
-      break;
-    default:
-      return ERR_SYNTAX;
-    }
+    if ((status = parse_type(ctx, &declared)) != 0)
+      return status;
+    has_type = true;
   }
 
   if ((status = match(ctx, T_ASSIGN)) != 0)
@@ -790,8 +793,6 @@ static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
       return STATIC_SEM_TYPE_ERR;
     var_type = declared;
   } else {
-    if (expr_type == EXPR_TYPE_BOOL)
-      return STATIC_SEM_TYPE_ERR;
     var_type = kw_from_expr_type(expr_type);
   }
 
@@ -826,19 +827,9 @@ static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
-    switch (ctx->current_token.token_type) {
-    case T_KW_INT:
-    case T_KW_DOUBLE:
-    case T_KW_STRING:
-    case T_KW_UNIT:
-      declared = ctx->current_token.token_type;
-      has_type = true;
-      advance(ctx);
-      TOKEN_CHEK(ctx->current_token)
-      break;
-    default:
-      return ERR_SYNTAX;
-    }
+    if ((status = parse_type(ctx, &declared)) != 0)
+      return status;
+    has_type = true;
   }
 
   if ((status = match(ctx, T_ASSIGN)) != 0)
@@ -855,8 +846,6 @@ static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
       return STATIC_SEM_TYPE_ERR;
     var_type = declared;
   } else {
-    if (expr_type == EXPR_TYPE_BOOL)
-      return STATIC_SEM_TYPE_ERR;
     var_type = kw_from_expr_type(expr_type);
   }
 
@@ -907,8 +896,7 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
     return status;
   }
 
-  if (expr_type == EXPR_TYPE_BOOL ||
-      !types_compatible(entry->type, expr_type)) {
+  if (!types_compatible(entry->type, expr_type)) {
     free(id);
     return STATIC_SEM_TYPE_ERR;
   }
