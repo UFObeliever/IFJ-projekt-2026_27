@@ -15,6 +15,8 @@ symtable_entry *symtable_entry_init(void) {
   entry->declared = false;
   entry->f_param_count = 0;
   entry->f_params = NULL;
+  entry->f_list_count = 1;
+  entry->f_list_sizes = NULL;
   return entry;
 }
 
@@ -23,6 +25,7 @@ void symtable_entry_dispose(symtable_entry *entry) {
     if (entry->function && entry->f_params != NULL) {
       free(entry->f_params);
     }
+    free(entry->f_list_sizes);
     free(entry);
   }
 }
