@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define INTERP_MAX_DEPTH 32
+
 typedef enum TokenType {
   T_INT_LITERAL,
   T_DOUBLE_LITERAL,
@@ -118,6 +120,13 @@ typedef enum State {
   S_MAIN_I,
   S_MAIN_N,
   S_DOT_CHECK_DOUBLE,
+  S_ISTR_STAR,
+  S_ISTR_QUOTE,
+  S_ISTR_BODY,
+  S_ISTR_BACKSLASH,
+  S_ISTR_DOLLAR,
+  S_ISTR_ID,
+  S_ISTR_MQUOTES,
 } State;
 
 typedef struct {
@@ -136,9 +145,28 @@ typedef union {
   token_indents token_indents;
 } Token;
 
+typedef enum InterpPhase {
+  IP_START,
+  IP_BODY,
+  IP_EXPR,
+} InterpPhase;
+
+typedef struct {
+  InterpPhase phase;
+  bool multiline;
+  bool has_part;
+  int expr_token;
+} InterpLevel;
+
 typedef struct {
   StringBuff Buffer;
   FILE *input;
+  Token *pending;
+  size_t pending_len;
+  size_t pending_pos;
+  size_t pending_cap;
+  int interp_depth;
+  InterpLevel interp[INTERP_MAX_DEPTH];
 } LexerCtx;
 
 // Uvolní paměť tokenu

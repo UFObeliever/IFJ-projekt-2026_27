@@ -72,6 +72,66 @@
 #define MAKE_TOKEN_TAB()                                                       \
   (Token) { .token_type = (T_TAB) }
 
+// Static pro jistotu, aby nevznikla kolize, kdyby něco similar
+static void discard_token(Token t) {
+  switch (t.token_type) {
+  case T_INT_LITERAL:
+  case T_DOUBLE_LITERAL:
+  case T_STRING_LITERAL:
+  case T_IDENTIFICATOR:
+    free((void *)t.token_lexeme.lexeme);
+    break;
+  default:
+    break;
+  }
+}
+
+static void queue_clear(LexerCtx *ctx) {
+  for (size_t i = ctx->pending_pos; i < ctx->pending_len; i++) {
+    discard_token(ctx->pending[i]);
+  }
+  ctx->pending_len = 0;
+  ctx->pending_pos = 0;
+}
+
+static bool queue_push(LexerCtx *ctx, Token t) {
+  if (ctx->pending_len == ctx->pending_cap) {
+    size_t cap = ctx->pending_cap ? ctx->pending_cap * 2 : 16;
+    Token *tmp = realloc(ctx->pending, cap * sizeof(Token));
+    if (tmp == NULL) {
+      return false;
+    }
+    ctx->pending = tmp;
+    ctx->pending_cap = cap;
+  }
+  ctx->pending[ctx->pending_len++] = t;
+  return true;
+}
+
+static bool queue_push_lexeme(LexerCtx *ctx, TokenType type, const char *text) {
+  size_t len = strlen(text);
+  char *copy = malloc(len + 1);
+  if (copy == NULL) {
+    return false;
+  }
+  memcpy(copy, text, len + 1);
+  Token t = {.token_lexeme = {.type = type, .lexeme = copy}};
+  if (!queue_push(ctx, t)) {
+    free(copy);
+    return false;
+  }
+  return true;
+}
+
+static Token queue_pop(LexerCtx *ctx) {
+  Token t = ctx->pending[ctx->pending_pos++];
+  if (ctx->pending_pos == ctx->pending_len) {
+    ctx->pending_pos = 0;
+    ctx->pending_len = 0;
+  }
+  return t;
+}
+
 void lexer_init(LexerCtx *ctx, FILE *input) {
   ctx->input = input;
   sb_init(&ctx->Buffer, 16);
