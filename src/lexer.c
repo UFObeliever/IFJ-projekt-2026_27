@@ -1,6 +1,8 @@
 #include "lexer.h"
 #include <assert.h>
 
+#define INTERP_TOP(ctx) ((ctx)->interp[(ctx)->interp_depth - 1])
+
 /**
  * @brief Makro na vytvoření tokenu lexémy
  *
@@ -135,9 +137,19 @@ static Token queue_pop(LexerCtx *ctx) {
 void lexer_init(LexerCtx *ctx, FILE *input) {
   ctx->input = input;
   sb_init(&ctx->Buffer, 16);
+
+  ctx->pending = NULL;
+  ctx->pending_len = 0;
+  ctx->pending_pos = 0;
+  ctx->pending_cap = 0;
+  ctx->interp_depth = 0;
 }
 
 void lexer_free(LexerCtx *ctx) {
+  queue_clear(ctx);
+  free(ctx->pending);
+  ctx->pending = NULL;
+  ctx->pending_cap = 0;
   sb_free(&ctx->Buffer);
   ctx->input = NULL;
 }
@@ -806,6 +818,352 @@ Token lex_main_func(LexerCtx *ctx) {
       break; //
     }
   }
+}
+
+static Token interp_error(LexerCtx *ctx) {
+  ctx->interp_depth = 0;
+  queue_clear(ctx);
+  sb_reset(&ctx->Buffer);
+  return MAKE_TOKEN_ERROR();
+}
+
+static bool interp_begin_part(LexerCtx *ctx) {
+  InterpLevel *lv = &INTERP_TOP(ctx);
+  if (lv->has_part && !queue_push(ctx, MAKE_TOKEN(T_PLUS_SIGN))) {
+    return false;
+  }
+  lv->has_part = true;
+  return true;
+}
+
+static bool interp_flush_literal(LexerCtx *ctx) {
+  if (ctx->Buffer.length == 0) {
+    return true;
+  }
+  if (!interp_begin_part(ctx)) {
+    return false;
+  }
+  Token t = MAKE_TOKEN_LEXEME(T_STRING_LITERAL, &ctx->Buffer);
+  sb_reset(&ctx->Buffer);
+  if (!queue_push(ctx, t)) {
+    discard_token(t);
+    return false;
+  }
+  return true;
+}
+
+static bool interp_push_tostr_open(LexerCtx *ctx) {
+  return queue_push_lexeme(ctx, T_IDENTIFICATOR, "toStr") &&
+         queue_push(ctx, MAKE_TOKEN(T_OPEN_BRACKET)) &&
+         queue_push(ctx, MAKE_TOKEN(T_OPEN_BRACKET));
+}
+
+static bool interp_push_tostr_close(LexerCtx *ctx) {
+  return queue_push(ctx, MAKE_TOKEN(T_CLOSE_BRACKET)) &&
+         queue_push(ctx, MAKE_TOKEN(T_CLOSE_BRACKET));
+}
+
+static Token interp_finish(LexerCtx *ctx) {
+  bool ok = interp_flush_literal(ctx);
+  if (ok && !INTERP_TOP(ctx).has_part) {
+    ok = queue_push_lexeme(ctx, T_STRING_LITERAL, "");
+  }
+  if (ok) {
+    ok = queue_push(ctx, MAKE_TOKEN(T_CLOSE_BRACKET));
+  }
+  if (!ok) {
+    return interp_error(ctx);
+  }
+  ctx->interp_depth--;
+  sb_reset(&ctx->Buffer);
+  return queue_pop(ctx);
+}
+
+static Token interp_begin_expr(LexerCtx *ctx) {
+  if (!interp_flush_literal(ctx) || !interp_begin_part(ctx) ||
+      !interp_push_tostr_open(ctx)) {
+    return interp_error(ctx);
+  }
+  INTERP_TOP(ctx).phase = IP_EXPR;
+  INTERP_TOP(ctx).expr_tokens = 0;
+  sb_reset(&ctx->Buffer);
+  return queue_pop(ctx);
+}
+
+static Token interp_emit_ident(LexerCtx *ctx) {
+  if (ctx->Buffer.length == 1 && ctx->Buffer.data[0] == '_') {
+    return interp_error(ctx);
+  }
+  if (!interp_begin_part(ctx) || !interp_push_tostr_open(ctx)) {
+    return interp_error(ctx);
+  }
+  Token id = MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
+  sb_reset(&ctx->Buffer);
+  if (!queue_push(ctx, id)) {
+    discard_token(id);
+    return interp_error(ctx);
+  }
+  if (!interp_push_tostr_close(ctx)) {
+    return interp_error(ctx);
+  }
+  return queue_pop(ctx);
+}
+
+static Token interp_open(LexerCtx *ctx) {
+  if (ctx->interp_depth >= INTERP_MAX_DEPTH) {
+    return interp_error(ctx);
+  }
+  if (ctx->interp_depth > 0) {
+    INTERP_TOP(ctx).expr_tokens++;
+  }
+  ctx->interp_depth++;
+  INTERP_TOP(ctx) = (InterpLevel){.phase = IP_START,
+                                  .multiline = false,
+                                  .has_part = false,
+                                  .expr_tokens = 0};
+  if (!queue_push(ctx, MAKE_TOKEN(T_OPEN_BRACKET))) {
+    return interp_error(ctx);
+  }
+  return queue_pop(ctx);
+}
+
+static Token interp_close_expr(LexerCtx *ctx) {
+  if (INTERP_TOP(ctx).expr_tokens == 0) {
+    return interp_error(ctx);
+  }
+  if (!interp_push_tostr_close(ctx)) {
+    return interp_error(ctx);
+  }
+  INTERP_TOP(ctx).phase = IP_BODY;
+  return queue_pop(ctx);
+}
+
+static Token lex_interp_literal(LexerCtx *ctx) {
+  InterpLevel *lv = &INTERP_TOP(ctx);
+  State current_state = (lv->phase == IP_START) ? S_ISTR_START : S_ISTR_BODY;
+  int run = 0;
+  sb_reset(&ctx->Buffer);
+  while (1) {
+    int c = fgetc(ctx->input);
+    switch (current_state) {
+    case S_ISTR_START:
+      if (c == '"') {
+        current_state = S_ISTR_QUOTE;
+      } else {
+        ungetc(c, ctx->input);
+        lv->phase = IP_BODY;
+        current_state = S_ISTR_BODY;
+      }
+      break;
+
+    case S_ISTR_QUOTE:
+      if (c == '"') {
+        lv->multiline = true;
+        lv->phase = IP_BODY;
+        current_state = S_ISTR_BODY;
+      } else {
+        ungetc(c, ctx->input);
+        return interp_finish(ctx);
+      }
+      break;
+
+    case S_ISTR_BODY:
+      if (c == '"') {
+        if (lv->multiline) {
+          run = 1;
+          current_state = S_ISTR_MQUOTES;
+        } else {
+          return interp_finish(ctx);
+        }
+      } else if (c == '$') {
+        current_state = S_ISTR_DOLLAR;
+      } else if (c == '\\' && !lv->multiline) {
+        current_state = S_ISTR_BACKSLASH;
+      } else if (lv->multiline ? (c == '\n' || c == '\r' || c == '\t' ||
+                                  (c >= ' ' && c != 127))
+                               : (c >= ' ' && c < 127)) {
+        sb_append_char(&ctx->Buffer, (char)c);
+      } else {
+        return interp_error(ctx);
+      }
+      break;
+
+    case S_ISTR_BACKSLASH:
+      if (c == 'n') {
+        sb_append_char(&ctx->Buffer, '\n');
+      } else if (c == 't') {
+        sb_append_char(&ctx->Buffer, '\t');
+      } else if (c == 'r') {
+        sb_append_char(&ctx->Buffer, '\r');
+      } else if (c == '\\') {
+        sb_append_char(&ctx->Buffer, '\\');
+      } else if (c == '"') {
+        sb_append_char(&ctx->Buffer, '"');
+      } else {
+        return interp_error(ctx);
+      }
+      current_state = S_ISTR_BODY;
+      break;
+
+    case S_ISTR_MQUOTES:
+      if (c == '"') {
+        run++;
+      } else {
+        ungetc(c, ctx->input);
+        if (run >= 3) {
+          for (int i = 0; i < run - 3; i++) {
+            sb_append_char(&ctx->Buffer, '"');
+          }
+          return interp_finish(ctx);
+        }
+        for (int i = 0; i < run; i++) {
+          sb_append_char(&ctx->Buffer, '"');
+        }
+        current_state = S_ISTR_BODY;
+      }
+      break;
+
+    case S_ISTR_DOLLAR:
+      if (c == '$') {
+        sb_append_char(&ctx->Buffer, '$');
+        current_state = S_ISTR_BODY;
+      } else if (c == '{') {
+        return interp_begin_expr(ctx);
+      } else if (c == '_' || isalpha(c)) {
+        if (!interp_flush_literal(ctx)) {
+          return interp_error(ctx);
+        }
+        sb_reset(&ctx->Buffer);
+        sb_append_char(&ctx->Buffer, (char)c);
+        current_state = S_ISTR_ID;
+      } else {
+        return interp_error(ctx);
+      }
+      break;
+
+    case S_ISTR_ID:
+      if (c == '_' || isalnum(c)) {
+        sb_append_char(&ctx->Buffer, (char)c);
+      } else {
+        ungetc(c, ctx->input);
+        return interp_emit_ident(ctx);
+      }
+      break;
+
+    default:
+      assert(false && "Lex interpolated string state machine fell through!");
+      return interp_error(ctx);
+    }
+  }
+}
+
+static Token lex_token(LexerCtx *ctx) {
+  int c;
+  sb_reset(&ctx->Buffer);
+  c = fgetc(ctx->input);
+  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+  if (c == EOF) {
+    return MAKE_TOKEN(T_EOF);
+  }
+  if (c == '\r') {
+    c = fgetc(ctx->input);
+  }
+  if (c == ' ') {
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    return lex_white_space(ctx);
+  }
+  if (c == '\t') {
+    while (c == '\t') {
+      c = fgetc(ctx->input);
+    }
+    ungetc(c, ctx->input);
+    return MAKE_TOKEN_TAB();
+  }
+  if (c == '_' || isalpha(c)) {
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    Token id = lex_identificator(ctx);
+    if (id.token_type == T_IDENTIFICATOR &&
+        strcmp(id.token_lexeme.lexeme, "s") == 0) {
+      int quote = fgetc(ctx->input);
+      if (quote == '"') {
+        discard_token(id);
+        return interp_open(ctx);
+      }
+      ungetc(quote, ctx->input);
+    }
+    return id;
+  }
+  if (c == '\n') {
+    return MAKE_TOKEN(T_EOL);
+  }
+  if (c == '0' || isdigit(c)) {
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    ungetc(c, ctx->input);
+    return lex_numbers(ctx);
+  }
+  if (c == '+') {
+    return MAKE_TOKEN(T_PLUS_SIGN);
+  }
+  if (c == '-') {
+    return MAKE_TOKEN(T_MINUS_SIGN);
+  }
+  if (c == '"') {
+    ungetc(c, ctx->input);
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    return lex_string(ctx);
+  }
+  if (c == ',') {
+    return MAKE_TOKEN(T_COMMA);
+  }
+  if (c == ':') {
+    return MAKE_TOKEN(T_DOUBLE_DOT);
+  }
+  if (c == '*') {
+    return MAKE_TOKEN(T_MULT_SIGN);
+  }
+  if (c == '/') {
+    return lex_div_com(ctx);
+  }
+  if (c == '=') {
+    return lex_equal(ctx);
+  }
+  if (c == '>') {
+    return lex_compare_greater(ctx);
+  }
+  if (c == '<') {
+    return lex_compare_lesser(ctx);
+  }
+  if (c == '!') {
+    return lex_not_equal(ctx);
+  }
+  if (c == '.') {
+    int c2 = fgetc(ctx->input);
+    ungetc(c2, ctx->input);
+    if (isdigit(c2) || c2 == 'D' || c2 == 'd') {
+      ungetc(c, ctx->input);
+      return lex_numbers(ctx);
+    }
+    return MAKE_TOKEN(T_DOT);
+  }
+  if (c == '(') {
+    return MAKE_TOKEN(T_OPEN_BRACKET);
+  }
+  if (c == ')') {
+    return MAKE_TOKEN(T_CLOSE_BRACKET);
+  }
+  if (c == ';') {
+    return MAKE_TOKEN(T_SEMICOLON);
+  }
+  if (c == '@') {
+    return lex_main_func(ctx);
+  }
+  if (c == '}' && ctx->interp_depth > 0 && INTERP_TOP(ctx).phase == IP_EXPR) {
+    return interp_close_expr(ctx);
+  }
+
+  return MAKE_TOKEN_ERROR();
 }
 
 Token get_next_token(LexerCtx *ctx) {

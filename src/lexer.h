@@ -120,7 +120,7 @@ typedef enum State {
   S_MAIN_I,
   S_MAIN_N,
   S_DOT_CHECK_DOUBLE,
-  S_ISTR_STAR,
+  S_ISTR_START,
   S_ISTR_QUOTE,
   S_ISTR_BODY,
   S_ISTR_BACKSLASH,
@@ -155,7 +155,7 @@ typedef struct {
   InterpPhase phase;
   bool multiline;
   bool has_part;
-  int expr_token;
+  int expr_tokens;
 } InterpLevel;
 
 typedef struct {
