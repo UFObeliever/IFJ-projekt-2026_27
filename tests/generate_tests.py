@@ -923,7 +923,7 @@ add(c, "jmeno_funkce_se_zavorkami_bez_zavorek", 5, FB("def answer(): Int = 42", 
 add(c, "jmeno_funkce_s_parametrem_bez_zavorek", 5, FB("def inc(a: Int): Int = a + 1", "val x = inc"))
 add(c, "spatny_typ_ve_druhem_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", 'val x = add(1)("x")'))
 add(c, "spatny_pocet_ve_druhem_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1)(2, 3)"))
-add(c, "prirazeni_do_funkce_bez_seznamu", 6, FB("def answer: Int = 42", "answer = 3"))
+add(c, "prirazeni_do_funkce_bez_seznamu", 7, FB("def answer: Int = 42", "answer = 3"))
 add(c, "rekurze_bez_navratoveho_typu", 6, F("def loop = loop"))
 add(c, "spatny_navratovy_typ_bez_seznamu", 6, F('def answer: Int = "x"'))
 add(c, "main_s_parametrem_ve_druhem_seznamu", 5, PRO + "\n@main def main()(a: Int): Unit =\n  val m = 0\n")
