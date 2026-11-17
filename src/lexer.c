@@ -1167,114 +1167,42 @@ static Token lex_token(LexerCtx *ctx) {
 }
 
 Token get_next_token(LexerCtx *ctx) {
-  int c;
-  sb_reset(&ctx->Buffer);
-  c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
-  if (c == EOF) {
-    return MAKE_TOKEN(T_EOF);
-  }
-
-  if (c == '\r') { // ignore this character
-    c = fgetc(ctx->input);
-  }
-
-  /* dopsat stavy z jednotlivých FSM */
-  if (c == ' ') {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    ungetc(c, ctx->input);
-    return lex_white_space(ctx);
-  }
-
-  if (c == '\t') {
-    while (c == '\t') {
-      c = fgetc(ctx->input);
+  while (1) {
+    if (ctx->pending_pos < ctx->pending_len) {
+      return queue_pop(ctx);
     }
-    ungetc(c, ctx->input);
-    return MAKE_TOKEN_TAB();
-  }
-
-  if (c == '_' || isalpha(c)) {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    ungetc(c, ctx->input);
-    return lex_identificator(ctx);
-  }
-
-  if (c == '\n') {
-    return MAKE_TOKEN(T_EOL);
-  }
-
-  if (c == '0' || isdigit(c)) {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    ungetc(c, ctx->input);
-    return lex_numbers(ctx);
-  }
-
-  if (c == '+') {
-    return MAKE_TOKEN(T_PLUS_SIGN);
-  }
-
-  if (c == '-') {
-    return MAKE_TOKEN(T_MINUS_SIGN);
-  }
-  // stringy
-  if (c == '"') {
-    ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
-    return lex_string(ctx);
-  }
-  if (c == ',') {
-    return MAKE_TOKEN(T_COMMA);
-  }
-  if (c == ':') {
-    return MAKE_TOKEN(T_DOUBLE_DOT);
-  }
-
-  if (c == '*') {
-    return MAKE_TOKEN(T_MULT_SIGN);
-  }
-
-  if (c == '/') {
-    return lex_div_com(ctx);
-  }
-
-  if (c == '=') {
-    return lex_equal(ctx);
-  }
-  if (c == '>') {
-    return lex_compare_greater(ctx);
-  }
-  if (c == '<') {
-    return lex_compare_lesser(ctx);
-  }
-
-  if (c == '!') {
-    return lex_not_equal(ctx);
-  }
-  if (c == '.') {
-    int c2 = fgetc(ctx->input);
-    ungetc(c2, ctx->input);
-    if (isdigit(c2) || c2 == 'D' || c2 == 'd') {
-      ungetc(c, ctx->input);
-      return lex_numbers(ctx);
+    if (ctx->interp_depth > 0 && INTERP_TOP(ctx).phase != IP_EXPR) {
+      return lex_interp_literal(ctx);
     }
-    return MAKE_TOKEN(T_DOT);
-  }
-  if (c == '(') {
-    return MAKE_TOKEN(T_OPEN_BRACKET);
-  }
-  if (c == ')') {
-    return MAKE_TOKEN(T_CLOSE_BRACKET);
-  }
-  if (c == ';') {
-    return MAKE_TOKEN(T_SEMICOLON);
-  }
 
-  if (c == '@') {
-    return lex_main_func(ctx);
+    int depth_before = ctx->interp_depth;
+    Token t = lex_token(ctx);
+    if (depth_before == 0) {
+      return t;
+    }
+    if (t.token_type == T_ERROR) {
+      return interp_error(ctx);
+    }
+    if (ctx->interp_depth != depth_before || INTERP_TOP(ctx).phase != IP_EXPR) {
+      return t;
+    }
+    switch (t.token_type) {
+    case T_INDENTS:
+    case T_TAB:
+    case T_WHITESPACE_SEP:
+      continue;
+    case T_EOL:
+      if (INTERP_TOP(ctx).multiline) {
+        continue;
+      }
+      return interp_error(ctx);
+    case T_EOF:
+      return interp_error(ctx);
+    default:
+      INTERP_TOP(ctx).expr_tokens++;
+      return t;
+    }
   }
-
-  return MAKE_TOKEN_ERROR();
 }
 
 // Testing purposes
