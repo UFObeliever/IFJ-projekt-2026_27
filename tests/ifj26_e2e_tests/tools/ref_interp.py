@@ -240,6 +240,8 @@ class Cur:
 
     def type(self):
         k, v = self.next()
+        if (k, v) == ("ID", "Boolean"):
+            return v
         if k != "KW" or v not in TYPES:
             raise IFJError("očekáván typ, nalezeno %r" % (v,))
         return v
@@ -473,7 +475,7 @@ class Parser:
 # ------------------------------------------------------------------ vyhodnocení
 def tname(v):
     if isinstance(v, bool):
-        raise IFJError("Boolean nelze uložit (základní zadání)")
+        return "Boolean"
     if isinstance(v, int):
         return "Int"
     if isinstance(v, float):
@@ -678,7 +680,8 @@ class Interp:
             need(1, "Any")
             v = a[0]
             t = tname(v)
-            self.out.append(fmt_a(v) if t == "Double" else ("()" if t == "Unit" else str(v)))
+            self.out.append(fmt_a(v) if t == "Double" else ("()" if t == "Unit" else
+                            str(v).lower() if t == "Boolean" else str(v)))
             return UNIT
         if name == "readLine":
             need(0)
@@ -697,6 +700,8 @@ class Interp:
                 if v == int(v):
                     raise AssertionError("toStr celého Double je nejednoznačné: %r" % v)
                 return "%.2f" % v
+            if t == "Boolean":
+                return "true" if v else "false"
             return "()" if t == "Unit" else str(v)
         if name == "toInt":
             need(1, "Double")

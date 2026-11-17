@@ -1551,6 +1551,64 @@ while i <= 15 do
 """), out="1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz ")
 
 
+# ============================================================================= 13 Boolean jako hodnota (BOOLTHEN)
+c = "13_boolean_hodnoty"
+gen(c, "print_boolean", main("val a = 1 < 2\nval b = 1 > 2\nprint(a)\nprint(\" \")\nprint(b)\n" + NL), out="true false\n")
+gen(c, "var_boolean_se_meni", main("""\
+var b = 1 < 2
+print(b)
+b = 1 == 2
+print(b)
+""" + NL), out="truefalse\n")
+gen(c, "boolean_rizeni_cyklu", main("""\
+var i = 0
+var go = i < 5
+while go do
+  i = i + 1
+  go = i < 5
+""" + show("i")), out="5\n")
+gen(c, "funkce_vraci_boolean", prog("def even(n: Int): Boolean = n / 2 * 2 == n", """\
+var i = 0
+while i < 6 do
+  if even(i) then
+    print(i)
+  i = i + 1
+""" + NL), out="024\n")
+gen(c, "boolean_parametr", prog("""\
+def choose(b: Boolean, x: Int, y: Int): Int =
+  if b then
+    return x
+  else
+    return y
+""", "val a = choose(3 > 2, 10, 20)\nval b = choose(3 < 2, 10, 20)\n" + show("a", "b")), out="10\n20\n")
+gen(c, "rovnost_boolean_hodnot", main("""\
+val t = 1 < 2
+val f = 1 > 2
+val a = t == t
+val b = t == f
+val c = t != f
+val d = f != f
+""" + show("a", "b", "c", "d")), out="true\nfalse\ntrue\nfalse\n")
+gen(c, "rovnost_ma_nizsi_prioritu_nez_relace", main("""\
+val t = 1 < 2
+val x = 5
+val a = t == x < 10
+val b = x > 10 == t
+""" + show("a", "b")), out="true\nfalse\n")
+gen(c, "odvozeny_typ_boolean", prog("def inRange(x: Int, lo: Int, hi: Int) = lo <= x == x <= hi", """\
+val a = inRange(5, 1, 10)
+val b = inRange(0, 1, 10)
+""" + show("a", "b")), out="true\nfalse\n")
+gen(c, "boolean_ze_vstupu", main("""\
+val n = readInt()
+val big = n > 100
+if big then
+  print("velke")
+else
+  print("male")
+""" + NL), stdin="150\n", out="velke\n")
+
+
 # ============================================================================= zápis
 def write_generator():
     if os.path.isdir(GEN_DIR):

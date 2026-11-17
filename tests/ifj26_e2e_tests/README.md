@@ -1,7 +1,7 @@
 # Testy celého překladače a generátoru kódu IFJ26 (bez rozšíření)
 
-    ./general_tests.py   --compiler ./ifj26 --interp ./ic26int     # všechno (732 testů)
-    ./generator_tests.py --compiler ./ifj26 --interp ./ic26int     # jen generátor (202 testů)
+    ./general_tests.py   --compiler ./ifj26 --interp ./ic26int     # všechno (778 testů)
+    ./generator_tests.py --compiler ./ifj26 --interp ./ic26int     # jen generátor (211 testů)
 
 Potřebuje jen Python 3 (žádné balíčky navíc).
 
@@ -18,9 +18,9 @@ Pro každý program: překladač dostane zdroj na **stdin** a IFJcode26 vypíše
 | `general_tests.py` | `tests/generator` + `tests/compiler` | celý překladač: chybové kódy 1–10 i běh platných programů |
 | `generator_tests.py` | `tests/generator` | jen generování kódu: výstup programů, běhové chyby, vstup ze stdin |
 
-`tests/compiler` je korpus z testů parseru (530 programů). U platných programů je navíc očekávaný
+`tests/compiler` je korpus z testů parseru (567 programů). U platných programů je navíc očekávaný
 výstup, takže se ověří i jejich běh. `tests/generator` jsou programy psané pro generátor
-(aritmetika, Double, řetězce, porovnání, cykly, rozsahy proměnných, funkce a rekurze, vstup, běhové chyby, algoritmy, PARAMLISTS, if bez else).
+(aritmetika, Double, řetězce, porovnání, cykly, rozsahy proměnných, funkce a rekurze, vstup, běhové chyby, algoritmy, PARAMLISTS, if bez else, Boolean hodnoty).
 
 ## Volby
 
@@ -39,7 +39,7 @@ duplicitní návěští, 53 = chybí `INT2FLOAT`, 56 = čtení neinicializované
 ## Odkud jsou očekávané výstupy (důležité)
 
 `ic26int` ani Scala nejsou po ruce, proto je výstup každého programu spočítaný referenčním interpretem
-`tools/ref_interp.py` (psaným podle zadání) a u 201 ze 202 testů navíc porovnaný s **ručně / nezávisle spočítanou
+`tools/ref_interp.py` (psaným podle zadání) a u 210 ze 211 testů navíc porovnaný s **ručně / nezávisle spočítanou
 hodnotou** – `tools/make_tests.py` spadne, když se neshodují. Přesto nejde o výstup skutečného `ic26int`.
 Když test selže, ale podle zadání je váš výstup správně, chyba může být v očekávání. Pro pochybnosti lze
 program porovnat se Scalou (`scala run ifj26.scala prog.scala`; Scala ale vypíše Double jinak než `%a`).
@@ -56,7 +56,7 @@ Rozhodnutí podle zadání, na kterých očekávání stojí:
 
     ./general_tests.py --compiler tools/fake_ifj26.py --interp tools/fake_ic26int.py
 
-Falešný překladač a interpret spustí referenční interpret. Musí projít všech 732 testů; proměnná
+Falešný překladač a interpret spustí referenční interpret. Musí projít všech 778 testů; proměnná
 `FAKE_MUTATE=out|run|header|rc|hang` záměrně něco pokazí, aby se ověřilo, že spouštěč selhání hlásí.
 
 ## Přidání testů

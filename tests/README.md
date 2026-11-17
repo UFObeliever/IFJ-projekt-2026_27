@@ -1,6 +1,6 @@
 # Testy parseru IFJ26 (základní zadání)
 
-530 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
+567 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
 
 ## Spuštění
 
@@ -30,7 +30,7 @@ Pády (SIGABRT z `assert`, SIGSEGV) a timeouty se hlásí odděleně.
 | 05_prikazy | val/var/přiřazení, středníky, výrazy jako příkazy, chybné začátky příkazů |
 | 06_if_while | podmínky, chybějící then/do/else, typ podmínky |
 | 07_vyrazy | priorita, unární minus, literály, syntaktické a typové chyby výrazů |
-| 08_typy | Int→Double, zúžení, odvozování, Boolean mimo podmínku |
+| 08_typy | Int→Double, zúžení, odvozování, Boolean mimo podmínku (uložení do `val` je od BOOLTHEN platné) |
 | 09_rozsahy_platnosti | shadowing, redefinice (4), použití mimo rozsah (3), zápis do val (7) |
 | 10_volani_funkci | vestavěné i uživatelské funkce, počet/typ argumentů (5), forward reference |
 | 11_navratove_typy | pravidla pro návratový typ, implicitní hodnota bloku, rekurze bez typu |
@@ -40,6 +40,7 @@ Pády (SIGABRT z `assert`, SIGSEGV) a timeouty se hlásí odděleně.
 | 15_cele_programy | příklady ze zadání a pár reálných programů |
 | 16_paramlists | rozšíření PARAMLISTS: funkce bez seznamu parametrů, více seznamů, chyby 4/5/6 |
 | 17_if_bez_else | rozšíření BOOLTHEN (část parseru): `if` bez `else`, `else if`, chyby 2/3/6 |
+| 18_boolean_hodnoty | rozšíření BOOLTHEN (část parseru): Boolean v proměnných, parametrech a návratových hodnotách, `==` nad Boolean, neasociativní relace, chyby 2/5/6 |
 
 ## Co testy nepokrývají
 
