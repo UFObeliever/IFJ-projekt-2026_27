@@ -543,11 +543,6 @@ náročnejší
     deferred = STATIC_SEM_ERR;
   if (deferred != SUCCESS)
     return deferred;
-  if (fn->type == T_ERROR && fn->body_state == BODY_PENDING) {
-    int status = resolve_function(parser, name, fn);
-    if (status != SUCCESS)
-      return (Error)status;
-  }
   if (fn->type == T_ERROR)
     return STATIC_SEM_TYPE_ERR;
 
