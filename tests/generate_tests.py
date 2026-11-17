@@ -73,6 +73,7 @@ C12 = "12_lexikalni"
 C13 = "13_komentare_retezce"
 C14 = "14_zatez"
 C15 = "15_cele_programy"
+C16 = "16_paramlists"
 
 # =============================================================== 01 prolog
 c = C1
@@ -860,6 +861,72 @@ def countA(s: String): Int =
   val c = countA(s)
   print(c)
 """))
+
+
+# =============================================================== 16 PARAMLISTS
+c = C16
+add(c, "ok_funkce_bez_seznamu_parametru", 0, FB("def answer: Int = 42", "val x = answer\nprint(x)"))
+add(c, "ok_bez_seznamu_bez_navratoveho_typu", 0, FB("def answer = 42", "val x = answer\nprint(x)"))
+add(c, "ok_bez_seznamu_blokove_telo", 0, FB("def answer: Int =\n  val a = 40\n  a + 2", "val x = answer\nprint(x)"))
+add(c, "ok_bez_seznamu_ve_vyrazu", 0, FB("def two: Int = 2", "val x = two * 3 + two\nprint(x)"))
+add(c, "ok_bez_seznamu_jako_argument", 0, FB("def two: Int = 2\ndef inc(a: Int): Int = a + 1", "val x = inc(two)\nprint(x)"))
+add(c, "ok_bez_seznamu_jako_prikaz", 0, FB('def hello: Unit = print("x")', "hello"))
+add(c, "ok_bez_seznamu_volani_pred_definici", 0, R("""\
+@main def main(): Unit =
+  val x = answer
+  print(x)
+
+def answer: Int = 42
+"""))
+add(c, "ok_dva_seznamy", 0, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1)(2)\nprint(x)"))
+add(c, "ok_tri_seznamy", 0, FB("def add(a: Int)(b: Int)(c: Int): Int = a + b + c", "val x = add(1)(2)(3)\nprint(x)"))
+add(c, "ok_prazdny_seznam_a_seznam", 0, FB("def offset()(value: Int): Int = value + 1", "val x = offset()(5)\nprint(x)"))
+add(c, "ok_vice_parametru_v_seznamech", 0,
+    FB("def f(a: Int, b: Int)(c: String): String = c", 'val s = f(1, 2)("abc")\nprint(s)'))
+add(c, "ok_ruzne_typy_v_seznamech", 0,
+    FB("def f(a: Int)(b: Double)(c: String): String = c", 'val s = f(1)(2.5)("x")\nprint(s)'))
+add(c, "ok_vyrazy_v_argumentech", 0, FB("def add(a: Int)(b: Int): Int = a + b", "val y = 3\nval x = add(y * 2)(y - 1)\nprint(x)"))
+add(c, "ok_vnorene_volani", 0, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(add(1)(2))(add(3)(4))\nprint(x)"))
+add(c, "ok_rekurze_s_navratovym_typem", 0, R("""\
+def f(n: Int)(acc: Int): Int =
+  if n == 0 then
+    return acc
+  else
+    return f(n - 1)(acc * n)
+
+@main def main(): Unit =
+  val x = f(5)(1)
+  print(x)
+"""))
+add(c, "ok_promenna_prekryje_funkci", 0, FB("def answer: Int = 42", "val answer = 7\nprint(answer)"))
+add(c, "ok_main_bez_seznamu", 0, PRO + "\n@main def main: Unit =\n  val m = 0\n")
+add(c, "ok_spec_priklad", 0, R("""\
+def answer: Int = 42
+def answerWithParens(): Int = 42
+def add(a: Int)(b: Int)(c: Int): Int = a + b + c
+def offset()(value: Int): Int = value + 1
+
+@main def run(): Unit =
+  val x = answer
+  val y = answerWithParens()
+  val sum = add(x)(y)(1)
+  val result = offset()(sum)
+  print(result)
+"""))
+add(c, "duplicitni_parametr_napric_seznamy", 4, F("def f(a: Int)(a: Int): Int = a"))
+add(c, "malo_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1)"))
+add(c, "moc_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1)(2)(3)"))
+add(c, "spatne_rozdeleni_argumentu", 5, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1, 2)()"))
+add(c, "vynechany_prazdny_seznam", 5, FB("def offset()(v: Int): Int = v", "val x = offset(1)"))
+add(c, "zavorky_u_funkce_bez_seznamu", 5, FB("def answer: Int = 42", "val x = answer()"))
+add(c, "jmeno_funkce_se_zavorkami_bez_zavorek", 5, FB("def answer(): Int = 42", "val x = answer"))
+add(c, "jmeno_funkce_s_parametrem_bez_zavorek", 5, FB("def inc(a: Int): Int = a + 1", "val x = inc"))
+add(c, "spatny_typ_ve_druhem_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", 'val x = add(1)("x")'))
+add(c, "spatny_pocet_ve_druhem_seznamu", 5, FB("def add(a: Int)(b: Int): Int = a + b", "val x = add(1)(2, 3)"))
+add(c, "prirazeni_do_funkce_bez_seznamu", 6, FB("def answer: Int = 42", "answer = 3"))
+add(c, "rekurze_bez_navratoveho_typu", 6, F("def loop = loop"))
+add(c, "spatny_navratovy_typ_bez_seznamu", 6, F('def answer: Int = "x"'))
+add(c, "main_s_parametrem_ve_druhem_seznamu", 5, PRO + "\n@main def main()(a: Int): Unit =\n  val m = 0\n")
 
 
 # =============================================================== zápis na disk
