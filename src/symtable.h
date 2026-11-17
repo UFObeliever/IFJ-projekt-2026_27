@@ -13,6 +13,20 @@ typedef struct f_param {
   char *name;
 } f_param;
 
+typedef struct SourceMark {
+  size_t pos;
+  Token tok;
+  int line_indent;
+  bool at_bol;
+} SourceMark;
+
+typedef enum BodyState {
+  BODY_NONE = 0,
+  BODY_PENDING,
+  BODY_IN_PROGRESS,
+  BODY_DONE,
+} BodyState;
+
 typedef struct symtable_entry {
   TokenType type;
   bool declared;
@@ -22,6 +36,11 @@ typedef struct symtable_entry {
   bool value;
   int f_param_count;
   f_param *f_params;
+  BodyState body_state;
+  bool is_main;
+  size_t def_pos;
+  SourceMark body_start;
+  SourceMark body_end;
 } symtable_entry;
 
 typedef struct avl_tree {
