@@ -1,6 +1,6 @@
 # Testy parseru IFJ26 (základní zadání)
 
-503 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
+530 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
 
 ## Spuštění
 
@@ -39,11 +39,12 @@ Pády (SIGABRT z `assert`, SIGSEGV) a timeouty se hlásí odděleně.
 | 14_zatez | hluboké závorky (limit `PrecedenceStack` 256), dlouhé výrazy, 300 funkcí… |
 | 15_cele_programy | příklady ze zadání a pár reálných programů |
 | 16_paramlists | rozšíření PARAMLISTS: funkce bez seznamu parametrů, více seznamů, chyby 4/5/6 |
+| 17_if_bez_else | rozšíření BOOLTHEN (část parseru): `if` bez `else`, `else if`, chyby 2/3/6 |
 
 ## Co testy nepokrývají
 
 Rozšíření (FUNEXP, BOOLTHEN, CONTROL, …) – testy předpokládají jen základní zadání,
-např. `if` bez `else` nebo volání funkce uvnitř výrazu je v nich chyba. Pokud některé
+např. volání funkce uvnitř výrazu je v nich chyba (`if` bez `else` už je platné, viz 17_if_bez_else). Pokud některé
 rozšíření děláte, příslušné testy smažte nebo přepište.
 
 ## Úpravy

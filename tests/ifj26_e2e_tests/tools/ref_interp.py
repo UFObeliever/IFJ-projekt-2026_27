@@ -429,11 +429,17 @@ class Parser:
             raise IFJError("za then nesmí nic následovat (základní zadání)")
         cond = parse_expr(toks[1:idx])
         then_b = self.block(ind)
-        if self.i < len(self.lines) and self.lines[self.i] == (ind, [("KW", "else")]):
+        else_b = []
+        if (self.i < len(self.lines) and self.lines[self.i][0] == ind
+                and self.lines[self.i][1][:1] == [("KW", "else")]):
+            rest = self.lines[self.i][1][1:]
             self.i += 1
-            else_b = self.block(ind)
-        else:
-            raise IFJError("chybí else (základní zadání)")
+            if not rest:
+                else_b = self.block(ind)
+            elif rest[0] == ("KW", "if"):
+                else_b = [self.if_stmt(rest, ind)]
+            else:
+                raise IFJError("za else nesmí nic následovat")
         return ("if", cond, then_b, else_b)
 
     def while_stmt(self, toks, ind):

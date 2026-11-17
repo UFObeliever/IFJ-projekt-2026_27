@@ -74,6 +74,7 @@ C13 = "13_komentare_retezce"
 C14 = "14_zatez"
 C15 = "15_cele_programy"
 C16 = "16_paramlists"
+C17 = "17_if_bez_else"
 
 # =============================================================== 01 prolog
 c = C1
@@ -238,8 +239,8 @@ add(c, "else_vic_odsazeny_nez_if", 2,
     B("var a = 0\nif a < 1 then\n    a = 1\n  else\n    a = 2"))
 add(c, "else_mene_odsazeny_nez_if", 2,
     PRO + "\n@main def main(): Unit =\n  var a = 0\n  if a < 1 then\n    a = 1\nelse\n  a = 2\n")
-add(c, "chybi_else_v_zakladnim_zadani", 2, B("var a = 0\nif a < 1 then\n  a = 1"))
-add(c, "chybi_else_u_vnitrniho_if", 2,
+add(c, "ok_if_bez_else_boolthen", 0, B("var a = 0\nif a < 1 then\n  a = 1"))
+add(c, "ok_vnitrni_if_bez_else_boolthen", 0,
     B("var a = 0\nif a < 1 then\n  if a < 0 then\n    a = 1\nelse\n  a = 3"))
 add(c, "else_bez_if", 2, B("var a = 0\nelse\n  a = 1"))
 add(c, "dvojity_else", 2,
@@ -927,6 +928,74 @@ add(c, "prirazeni_do_funkce_bez_seznamu", 7, FB("def answer: Int = 42", "answer 
 add(c, "rekurze_bez_navratoveho_typu", 6, F("def loop = loop"))
 add(c, "spatny_navratovy_typ_bez_seznamu", 6, F('def answer: Int = "x"'))
 add(c, "main_s_parametrem_ve_druhem_seznamu", 5, PRO + "\n@main def main()(a: Int): Unit =\n  val m = 0\n")
+
+
+# =============================================================== 17 if bez else, else if (BOOLTHEN)
+c = C17
+add(c, "ok_if_bez_else", 0, B("var a = 0\nif a < 1 then\n  a = 1\nprint(a)"))
+add(c, "ok_if_bez_else_na_konci_souboru", 0, B('if 1 < 2 then\n  print("x")'))
+add(c, "ok_dva_if_bez_else_za_sebou", 0, B("var a = 0\nif a < 1 then\n  a = 1\nif a < 5 then\n  a = 2\nprint(a)"))
+add(c, "ok_if_bez_else_v_cyklu", 0, B("var i = 0\nwhile i < 3 do\n  if i == 1 then\n    print(i)\n  i = i + 1"))
+add(c, "ok_vnitrni_if_bez_else_vnejsi_s_else", 0,
+    B('val a = 1\nif a == 1 then\n  if a == 2 then\n    print("x")\nelse\n  print("y")'))
+add(c, "ok_else_if", 0, B('val x = 0\nif x < 0 then\n  print("n")\nelse if x == 0 then\n  print("z")\nelse\n  print("p")'))
+add(c, "ok_else_if_bez_else", 0, B('val x = 0\nif x < 0 then\n  print("n")\nelse if x == 0 then\n  print("z")'))
+add(c, "ok_vice_else_if", 0, B("""\
+val x = 5
+if x < 0 then
+  print("a")
+else if x == 0 then
+  print("b")
+else if x < 10 then
+  print("c")
+else if x < 100 then
+  print("d")
+else
+  print("e")
+"""))
+add(c, "ok_else_if_vnorene_v_bloku", 0, B("""\
+val x = 5
+if x > 0 then
+  if x < 3 then
+    print("a")
+  else if x < 7 then
+    print("b")
+else
+  print("c")
+"""))
+add(c, "ok_if_v_else_bloku_na_dalsim_radku", 0, B('val x = 1\nif x > 2 then\n  print("a")\nelse\n  if x > 0 then\n    print("b")'))
+add(c, "ok_unit_navratovy_typ_if_bez_else", 0, FB('def f(x: Int): Unit =\n  if x < 0 then\n    print("n")', "f(1)"))
+add(c, "ok_odvozeny_unit_if_bez_else", 0, FB('def f(x: Int) =\n  if x < 0 then\n    print("n")', "f(1)"))
+add(c, "ok_return_ve_vsech_vetvich_else_if", 0, FB("""\
+def f(x: Int): Int =
+  if x < 0 then
+    return 0
+  else if x == 0 then
+    return 1
+  else
+    return 2
+""", "val r = f(0)\nprint(r)"))
+add(c, "ok_if_bez_else_a_return_za_nim", 0, FB("def f(x: Int): Int =\n  if x < 0 then\n    return 0\n  return 1", "val r = f(1)\nprint(r)"))
+add(c, "if_bez_else_na_konci_funkce_s_typem", 6, F("def f(x: Int): Int =\n  if x < 0 then\n    return 0"))
+add(c, "else_if_bez_else_na_konci_funkce_s_typem", 6,
+    F("def f(x: Int): Int =\n  if x < 0 then\n    return 0\n  else if x == 0 then\n    return 1"))
+add(c, "promenna_z_then_v_else_if", 3, B("if 1 < 2 then\n  val q = 1\nelse if 2 < 3 then\n  print(q)"))
+add(c, "promenna_z_if_bez_else_za_nim", 3, B("if 1 < 2 then\n  val q = 1\nprint(q)"))
+add(c, "else_if_bez_then", 2, B("if 1 < 2 then\n  val a = 1\nelse if 2 < 3\n  val b = 1"))
+add(c, "else_if_bez_podminky", 2, B("if 1 < 2 then\n  val a = 1\nelse if then\n  val b = 1"))
+add(c, "else_if_bez_tela", 2, B("if 1 < 2 then\n  val a = 1\nelse if 2 < 3 then\nval b = 1"))
+add(c, "else_if_podminka_neni_boolean", 6, B("if 1 < 2 then\n  val a = 1\nelse if 5 then\n  val b = 1"))
+add(c, "else_if_vic_odsazeny", 2, B("if 1 < 2 then\n  val a = 1\n else if 2 < 3 then\n  val b = 1"))
+add(c, "else_if_mene_odsazeny_nez_if", 2, R("""\
+@main def main(): Unit =
+  if 1 < 2 then
+    val a = 1
+else if 2 < 3 then
+  val b = 1
+"""))
+add(c, "else_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse\n  val c = 1"))
+add(c, "else_if_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse if 2 < 3 then\n  val c = 1"))
+add(c, "prikaz_za_else_na_radku", 2, B("if 1 < 2 then\n  val a = 1\nelse val b = 1"))
 
 
 # =============================================================== zápis na disk
