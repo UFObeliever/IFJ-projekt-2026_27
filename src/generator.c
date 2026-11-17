@@ -47,7 +47,7 @@ typedef struct GeneratorContext {
 
   int label_cnt; /**< čítač pro unikátní návěští (if, while) */
   int var_cnt;   /**< číslo, které dostane další deklarovaná proměnná */
-  int failed;    /**< příznak chyby, po jeho nastavení se přestane generovat */
+  int failed; /**< příznak chyby, po jeho nastavení se přestane generovat */
 
   ASTNode *cur_fn; /**< funkce, která se právě generuje */
   ASTNode *prog;   /**< kořen AST (AST_PROGRAM) */
@@ -111,8 +111,8 @@ static void emit(GeneratorContext *ctx, const char *fmt, ...) {
 /**
  * @brief Zapíše řetězcový literál ve tvaru konstanty IFJcode26 (string@...)
  *
- * Znaky s ASCII kódem 0-32, 35 (#), 92 (zpětné lomítko) a 127 se zapisují jako escape
- * sekvence \xyz, kde xyz je třímístný dekadický kód znaku.
+ * Znaky s ASCII kódem 0-32, 35 (#), 92 (zpětné lomítko) a 127 se zapisují jako
+ * escape sekvence \xyz, kde xyz je třímístný dekadický kód znaku.
  *
  * @param ctx: kontext generátoru
  * @param s: řetězec ke vložení (už se skutečnými znaky, ne escape sekvencemi)
@@ -160,8 +160,7 @@ static int declare(GeneratorContext *ctx, const char *name) {
 
   if (ctx->vars_n == ctx->vars_cap) {
     size_t new_cap = ctx->vars_cap ? ctx->vars_cap * 2 : 32;
-    if (new_cap < ctx->vars_cap ||
-        new_cap > (size_t)-1 / sizeof *ctx->vars) {
+    if (new_cap < ctx->vars_cap || new_cap > (size_t)-1 / sizeof *ctx->vars) {
       ctx->failed = 1;
       return 0;
     }
@@ -241,8 +240,7 @@ static ASTNode *find_func(GeneratorContext *ctx, const char *name) {
   }
 
   for (ASTNode *f = ctx->prog->data.block.statements; f; f = f->next) {
-    if (f->type == AST_FUNC_DEF &&
-        strcmp(f->data.func_def.name, name) == 0) {
+    if (f->type == AST_FUNC_DEF && strcmp(f->data.func_def.name, name) == 0) {
       return f;
     }
   }
@@ -416,8 +414,7 @@ static void gen_call(GeneratorContext *ctx, ASTNode *c) {
    */
   int n = 0;
   ASTNode *param = fn->data.func_def.params;
-  for (ASTNode *arg = c->data.func_call.arguments;
-       arg; arg = arg->next, n++) {
+  for (ASTNode *arg = c->data.func_call.arguments; arg; arg = arg->next, n++) {
     gen_expr(ctx, arg);
     if (param) {
       convert(ctx, arg->expr_type, param->expr_type);
@@ -465,13 +462,12 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
   }
 
   int is_string = (left->expr_type == EXPR_TYPE_STRING);
-  int both_int = (left->expr_type == EXPR_TYPE_INT &&
-                  right->expr_type == EXPR_TYPE_INT);
+  int both_int =
+      (left->expr_type == EXPR_TYPE_INT && right->expr_type == EXPR_TYPE_INT);
 
   if (op == T_PLUS_SIGN && is_string) {
-    emit(ctx,
-         "POPS GF@_t2\nPOPS GF@_t1\nCONCAT GF@_t3 GF@_t1 GF@_t2\n"
-         "PUSHS GF@_t3\n");
+    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\nCONCAT GF@_t3 GF@_t1 GF@_t2\n"
+              "PUSHS GF@_t3\n");
   } else if (op == T_PLUS_SIGN) {
     emit(ctx, "ADDS\n");
   } else if (op == T_MINUS_SIGN) {
@@ -489,23 +485,21 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
      * x <= y je (x < y) OR (x == y).
      * NOT (x > y) není ekvivalentní pro NaN: NOT(false) by dalo true.
      */
-    emit(ctx,
-         "POPS GF@_t2\nPOPS GF@_t1\n"
-         "LT GF@_t3 GF@_t1 GF@_t2\n"
-         "EQ GF@_t4 GF@_t1 GF@_t2\n"
-         "OR GF@_t3 GF@_t3 GF@_t4\n"
-         "PUSHS GF@_t3\n");
+    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
+              "LT GF@_t3 GF@_t1 GF@_t2\n"
+              "EQ GF@_t4 GF@_t1 GF@_t2\n"
+              "OR GF@_t3 GF@_t3 GF@_t4\n"
+              "PUSHS GF@_t3\n");
   } else if (op == T_GTE) {
     /*
      * x >= y je (x > y) OR (x == y).
      * I zde zůstává výsledek pro NaN false.
      */
-    emit(ctx,
-         "POPS GF@_t2\nPOPS GF@_t1\n"
-         "GT GF@_t3 GF@_t1 GF@_t2\n"
-         "EQ GF@_t4 GF@_t1 GF@_t2\n"
-         "OR GF@_t3 GF@_t3 GF@_t4\n"
-         "PUSHS GF@_t3\n");
+    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
+              "GT GF@_t3 GF@_t1 GF@_t2\n"
+              "EQ GF@_t4 GF@_t1 GF@_t2\n"
+              "OR GF@_t3 GF@_t3 GF@_t4\n"
+              "PUSHS GF@_t3\n");
   } else if (op == T_EQUAL) {
     emit(ctx, "EQS\n");
   } else if (op == T_NOT_EQUAL) {
@@ -635,7 +629,8 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
     ASTNode *init = s->data.var_assign.expression;
     gen_expr(ctx, init);
     convert(ctx, init->expr_type, s->expr_type);
-    int id = declare(ctx, s->data.var_assign.identifier); /* až po inicializaci */
+    int id =
+        declare(ctx, s->data.var_assign.identifier); /* až po inicializaci */
     emit(ctx, "POPS LF@$v%d\n", id);
     break;
   }
@@ -644,8 +639,7 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
     ASTNode *rhs = s->data.var_assign.expression;
     gen_expr(ctx, rhs);
     convert(ctx, rhs->expr_type, s->expr_type);
-    emit(ctx, "POPS LF@$v%d\n",
-         lookup(ctx, s->data.var_assign.identifier));
+    emit(ctx, "POPS LF@$v%d\n", lookup(ctx, s->data.var_assign.identifier));
     break;
   }
 
@@ -743,8 +737,8 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
 
   int returned = 0;
   size_t mark = ctx->vars_n;
-  for (ASTNode *s = fn->data.func_def.body->data.block.statements;
-       s; s = s->next) {
+  for (ASTNode *s = fn->data.func_def.body->data.block.statements; s;
+       s = s->next) {
     if (!s->next && is_expr(s)) {
       /* Poslední výraz těla funkce určuje návratovou hodnotu. */
       gen_return_value(ctx, s);
@@ -875,9 +869,8 @@ int generate_program(ASTNode *root, FILE *outf) {
   }
 
   emit(&ctx, ".IFJcode26\n");
-  emit(&ctx,
-       "DEFVAR GF@_ret\nDEFVAR GF@_t1\nDEFVAR GF@_t2\nDEFVAR GF@_t3\n"
-       "DEFVAR GF@_t4\nDEFVAR GF@_t5\nDEFVAR GF@_t6\n");
+  emit(&ctx, "DEFVAR GF@_ret\nDEFVAR GF@_t1\nDEFVAR GF@_t2\nDEFVAR GF@_t3\n"
+             "DEFVAR GF@_t4\nDEFVAR GF@_t5\nDEFVAR GF@_t6\n");
   emit(&ctx, "CREATEFRAME\nCALL $fn_%s\nEXIT int@0\n\n", main_name);
   sb_append_str(&ctx.out, HELPERS);
 
