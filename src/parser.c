@@ -595,13 +595,10 @@ static int parse_defsingle(ParserCtx *ctx) {
 
   symtable_entry *fentry = NULL;
   if (smt_search_global(&ctx->smt, (char *)h.name, &fentry)) {
-    /* Stejné jméno už existuje: v pořádku je jen to, že je to signatura
-     * zapsaná předprůchodem právě pro tuto definici. */
     if (fentry->body_state == BODY_NONE || fentry->def_pos != def_pos)
       return REDEF_FN_VAR_ERR;
     free_params(h.params, h.param_count);
     if (fentry->body_state == BODY_DONE) {
-      /* Tělo už se zanalyzovalo na požádání, přeskočíme ho. */
       mark_set(ctx, &fentry->body_end);
       return 0;
     }
