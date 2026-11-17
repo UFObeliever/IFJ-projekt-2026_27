@@ -991,17 +991,24 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
 
   while (ctx->current_token.token_type == T_EOL)
     advance(ctx);
-  if (ctx->current_token.token_type != T_KW_ELSE ||
-      ctx->line_indent != current_indent)
-    return ERR_SYNTAX;
-  if ((status = match(ctx, T_KW_ELSE)) != 0)
-    return status;
-  if ((status = parse_block(ctx, current_indent, &else_info,
-                            &n->data.if_stmt.else_body)) != 0)
-    return status;
+  bool has_else = ctx->current_token.token_type == T_KW_ELSE &&
+                  ctx->line_indent == current_indent;
+  if (has_else) {
+    if ((status = match(ctx, T_KW_ELSE)) != 0)
+      return status;
+    if (ctx->current_token.token_type == T_KW_IF) {
+      if ((status = parse_if_statement(ctx, current_indent, &else_info)) != 0)
+        return status;
+      n->data.if_stmt.else_body = ast_create_node(AST_BLOCK);
+      n->data.if_stmt.else_body->data.block.statements = else_info.node;
+    } else if ((status = parse_block(ctx, current_indent, &else_info,
+                                     &n->data.if_stmt.else_body)) != 0) {
+      return status;
+    }
+  }
 
   info->kind = SK_IF;
-  info->returns = then_info.returns && else_info.returns;
+  info->returns = then_info.returns && has_else && else_info.returns;
   info->node = n;
   return 0;
 }
