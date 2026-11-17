@@ -886,10 +886,6 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
     free(id);
     return UNDEF_FN_ERR;
   }
-  if (entry->function) {
-    free(id);
-    return STATIC_SEM_TYPE_ERR;
-  }
   if (!entry->variable) {
     free(id);
     return WRITE_ERR;
