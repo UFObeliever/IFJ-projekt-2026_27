@@ -6,7 +6,8 @@
  * Použité principy:
  *  - výrazy se počítají zásobníkově, výsledek je vždy na datovém zásobníku,
  *  - všechny DEFVAR funkce se vypisují najednou na jejím začátku,
- *  - proměnné se jmenují LF@$v<id>, kde id je pořadové číslo deklarace,
+ *  - proměnné se jmenují LF@$v<id>, kde id je pořadové číslo deklarace
+ *    (parametry mají id 0..k-1),
  *  - návratová hodnota funkce se předává přes globální proměnnou GF@_ret,
  *  - vestavěné funkce se generují přímo v místě volání, složitější
  *    (ord, subStr, celočíselné dělení) jako pomocné rutiny volané přes CALL,
@@ -17,7 +18,7 @@
 #include "DynBuff.h"
 #include "Error.h"
 #include "lexer.h"
-#include "precedence.h"
+#include "precedence.h" /* ExprType (EXPR_TYPE_*) */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@ typedef struct GeneratorContext {
 
   int label_cnt; /**< čítač pro unikátní návěští (if, while) */
   int var_cnt;   /**< číslo, které dostane další deklarovaná proměnná */
-  int failed; /**< příznak chyby, po jeho nastavení se přestane generovat */
+  int failed;    /**< příznak chyby, po jeho nastavení se přestane generovat */
 
   ASTNode *cur_fn; /**< funkce, která se právě generuje */
   ASTNode *prog;   /**< kořen AST (AST_PROGRAM) */
@@ -56,11 +57,13 @@ typedef struct GeneratorContext {
   size_t vars_cap; /**< alokovaná kapacita pole vars */
 } GeneratorContext;
 
+/* ===== emitování ===== */
+
 /**
- * @brief Naformátuje text a připojí ho do výstupního bufferu
+ * @brief Naformátuje text (ve stylu printf) a připojí ho do výstupního bufferu
  *
  * Délka jedné instrukce není omezena, velikost pomocného bufferu se zjistí
- * z vsnprintf. Při chybě se nastaví ctx->failed.
+ * z vsnprintf. Při chybě (alokace, formátování) se nastaví ctx->failed.
  *
  * @param ctx: kontext generátoru
  * @param fmt: formátovací řetězec ve stylu printf
@@ -106,13 +109,13 @@ static void emit(GeneratorContext *ctx, const char *fmt, ...) {
 }
 
 /**
- * @brief Zapíše řetězcový literál ve tvaru konstanty IFJcode26
+ * @brief Zapíše řetězcový literál ve tvaru konstanty IFJcode26 (string@...)
  *
- * Znaky s ASCII kódem 0-32, 35 (#), 92 (zpětné lomítko) a 127 se zapisují jako
- * escape sekvence \xyz, kde xyz je třímístný dekadický kód znaku.
+ * Znaky s ASCII kódem 0-32, 35 (#), 92 (zpětné lomítko) a 127 se zapisují jako escape
+ * sekvence \xyz, kde xyz je třímístný dekadický kód znaku.
  *
  * @param ctx: kontext generátoru
- * @param s: řetězec ke vložení
+ * @param s: řetězec ke vložení (už se skutečnými znaky, ne escape sekvencemi)
  */
 static void emit_string_lit(GeneratorContext *ctx, const char *s) {
   if (!ctx || ctx->failed || !s) {
@@ -135,6 +138,8 @@ static void emit_string_lit(GeneratorContext *ctx, const char *s) {
   }
 }
 
+/* ===== proměnné: jméno -> číslo (LF@$v<id>) ===== */
+
 /**
  * @brief Zaregistruje novou proměnnou a přidělí jí další volné číslo
  *
@@ -155,7 +160,8 @@ static int declare(GeneratorContext *ctx, const char *name) {
 
   if (ctx->vars_n == ctx->vars_cap) {
     size_t new_cap = ctx->vars_cap ? ctx->vars_cap * 2 : 32;
-    if (new_cap < ctx->vars_cap || new_cap > (size_t)-1 / sizeof *ctx->vars) {
+    if (new_cap < ctx->vars_cap ||
+        new_cap > (size_t)-1 / sizeof *ctx->vars) {
       ctx->failed = 1;
       return 0;
     }
@@ -177,7 +183,7 @@ static int declare(GeneratorContext *ctx, const char *name) {
 }
 
 /**
- * @brief Najde číslo nejbližší viditelné proměnné daného jména
+ * @brief Najde číslo nejbližší (nejvnitřnější) viditelné proměnné daného jména
  *
  * Hledá se od konce zásobníku proměnných, takže vnořená deklarace překryje
  * stejně pojmenovanou proměnnou z nadřazeného bloku.
@@ -200,9 +206,11 @@ static int lookup(GeneratorContext *ctx, const char *name) {
     }
   }
 
-  ctx->failed = 1;
+  ctx->failed = 1; /* parser/sémantická analýza měla chybu odchytit dříve */
   return 0;
 }
+
+/* ===== pomocné ===== */
 
 /**
  * @brief Převede hodnotu na vrcholu zásobníku z typu from na typ to
@@ -225,7 +233,7 @@ static void convert(GeneratorContext *ctx, int from, int to) {
  *
  * @param ctx: kontext generátoru
  * @param name: jméno hledané funkce
- * @return uzel AST_FUNC_DEF, nebo NULL
+ * @return uzel AST_FUNC_DEF, nebo NULL (volaná funkce je pak vestavěná)
  */
 static ASTNode *find_func(GeneratorContext *ctx, const char *name) {
   if (!ctx || !ctx->prog || !name) {
@@ -233,7 +241,8 @@ static ASTNode *find_func(GeneratorContext *ctx, const char *name) {
   }
 
   for (ASTNode *f = ctx->prog->data.block.statements; f; f = f->next) {
-    if (f->type == AST_FUNC_DEF && strcmp(f->data.func_def.name, name) == 0) {
+    if (f->type == AST_FUNC_DEF &&
+        strcmp(f->data.func_def.name, name) == 0) {
       return f;
     }
   }
@@ -244,7 +253,7 @@ static ASTNode *find_func(GeneratorContext *ctx, const char *name) {
 /**
  * @brief Spočítá prvky seznamu uzlů propojeného přes ukazatel next
  *
- * @param p: první uzel seznamu, může být NULL
+ * @param p: první uzel seznamu (např. parametry funkce), může být NULL
  * @return počet uzlů v seznamu
  */
 static int count_list(ASTNode *p) {
@@ -259,7 +268,7 @@ static int count_list(ASTNode *p) {
  * @brief Spočítá deklarace proměnných v bloku včetně vnořených bloků
  *
  * Rekurzivně prochází větve if a těla while. Výsledek určuje, kolik příkazů
- * DEFVAR je potřeba vypsat na začátku funkce.
+ * DEFVAR je potřeba vypsat na začátku funkce (viz gen_function).
  *
  * @param block: uzel AST_BLOCK, může být NULL
  * @return počet příkazů AST_VAR_DECL v bloku a ve všech jeho podblocích
@@ -291,7 +300,7 @@ static int count_decls(ASTNode *block) {
 }
 
 /**
- * @brief Zjistí, zda je uzel výraz
+ * @brief Zjistí, zda je uzel výraz (a ne příkaz)
  *
  * @param s: uzel AST, může být NULL
  * @return 1 pokud jde o výraz (literál, identifikátor, operátor, volání),
@@ -318,7 +327,7 @@ static int is_expr(ASTNode *s) {
   }
 }
 
-/* výrazy: výsledek vždy na datovém zásobníku */
+/* ===== výrazy: výsledek vždy na datovém zásobníku ===== */
 static void gen_expr(GeneratorContext *ctx, ASTNode *e);
 static void gen_block(GeneratorContext *ctx, ASTNode *b);
 
@@ -337,6 +346,7 @@ static void gen_builtin(GeneratorContext *ctx, ASTNode *c) {
   const char *name = c->data.func_call.name;
   ASTNode *args = c->data.func_call.arguments;
 
+  /* Argumenty vestavěných funkcí se vyhodnocují zleva doprava. */
   for (ASTNode *arg = args; arg; arg = arg->next) {
     gen_expr(ctx, arg);
   }
@@ -352,9 +362,9 @@ static void gen_builtin(GeneratorContext *ctx, ASTNode *c) {
   } else if (!strcmp(name, "readLine")) {
     emit(ctx, "READ GF@_t1 string\nPUSHS GF@_t1\n");
   } else if (!strcmp(name, "readInt")) {
-    emit(ctx, "READ GF@_t1 int\nPUSHS GF@_t1\n");
+    emit(ctx, "CALL $$readint\n");
   } else if (!strcmp(name, "readDouble")) {
-    emit(ctx, "READ GF@_t1 float\nPUSHS GF@_t1\n");
+    emit(ctx, "CALL $$readdouble\n");
   } else if (!strcmp(name, "toStr")) {
     if (args->expr_type == EXPR_TYPE_INT) {
       emit(ctx, "INT2STRS\n");
@@ -380,7 +390,7 @@ static void gen_builtin(GeneratorContext *ctx, ASTNode *c) {
 }
 
 /**
- * @brief Vygeneruje volání funkce
+ * @brief Vygeneruje volání funkce (uživatelské, jinak vestavěné)
  *
  * Konvence volání uživatelské funkce:
  *  - volající vyhodnotí všechny argumenty na datový zásobník,
@@ -401,12 +411,13 @@ static void gen_call(GeneratorContext *ctx, ASTNode *c) {
   }
 
   /*
-   * 1) Všechny argumenty vyhodnotíme před vytvořením TF (TFT ;D).
+   * 1) Všechny argumenty vyhodnotíme před vytvořením TF.
    *    Vnořená volání tak nemohou přepsat dočasný rámec volající funkce.
    */
   int n = 0;
   ASTNode *param = fn->data.func_def.params;
-  for (ASTNode *arg = c->data.func_call.arguments; arg; arg = arg->next, n++) {
+  for (ASTNode *arg = c->data.func_call.arguments;
+       arg; arg = arg->next, n++) {
     gen_expr(ctx, arg);
     if (param) {
       convert(ctx, arg->expr_type, param->expr_type);
@@ -425,7 +436,7 @@ static void gen_call(GeneratorContext *ctx, ASTNode *c) {
 /**
  * @brief Vygeneruje binární operátor
  *
- * Nejprve se vyhodnotí levý a pravý operand. Pokud je jeden
+ * Nejprve se vyhodnotí levý a pravý operand (v tomto pořadí). Pokud je jeden
  * z nich Int a druhý Double, Int se převede na Double. Pak se vypíše
  * instrukce operátoru. Zvláštní případy:
  *  - + nad řetězci je CONCAT (není zásobníková, jde přes pomocné proměnné),
@@ -454,12 +465,13 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
   }
 
   int is_string = (left->expr_type == EXPR_TYPE_STRING);
-  int both_int =
-      (left->expr_type == EXPR_TYPE_INT && right->expr_type == EXPR_TYPE_INT);
+  int both_int = (left->expr_type == EXPR_TYPE_INT &&
+                  right->expr_type == EXPR_TYPE_INT);
 
   if (op == T_PLUS_SIGN && is_string) {
-    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\nCONCAT GF@_t3 GF@_t1 GF@_t2\n"
-              "PUSHS GF@_t3\n");
+    emit(ctx,
+         "POPS GF@_t2\nPOPS GF@_t1\nCONCAT GF@_t3 GF@_t1 GF@_t2\n"
+         "PUSHS GF@_t3\n");
   } else if (op == T_PLUS_SIGN) {
     emit(ctx, "ADDS\n");
   } else if (op == T_MINUS_SIGN) {
@@ -475,23 +487,25 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
   } else if (op == T_LTE) {
     /*
      * x <= y je (x < y) OR (x == y).
-     * NOT (x > y) není ekvivalentní pro NaN.
+     * NOT (x > y) není ekvivalentní pro NaN: NOT(false) by dalo true.
      */
-    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
-              "LT GF@_t3 GF@_t1 GF@_t2\n"
-              "EQ GF@_t4 GF@_t1 GF@_t2\n"
-              "OR GF@_t3 GF@_t3 GF@_t4\n"
-              "PUSHS GF@_t3\n");
+    emit(ctx,
+         "POPS GF@_t2\nPOPS GF@_t1\n"
+         "LT GF@_t3 GF@_t1 GF@_t2\n"
+         "EQ GF@_t4 GF@_t1 GF@_t2\n"
+         "OR GF@_t3 GF@_t3 GF@_t4\n"
+         "PUSHS GF@_t3\n");
   } else if (op == T_GTE) {
     /*
      * x >= y je (x > y) OR (x == y).
-     * zde zůstává výsledek pro NaN false.
+     * I zde zůstává výsledek pro NaN false.
      */
-    emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
-              "GT GF@_t3 GF@_t1 GF@_t2\n"
-              "EQ GF@_t4 GF@_t1 GF@_t2\n"
-              "OR GF@_t3 GF@_t3 GF@_t4\n"
-              "PUSHS GF@_t3\n");
+    emit(ctx,
+         "POPS GF@_t2\nPOPS GF@_t1\n"
+         "GT GF@_t3 GF@_t1 GF@_t2\n"
+         "EQ GF@_t4 GF@_t1 GF@_t2\n"
+         "OR GF@_t3 GF@_t3 GF@_t4\n"
+         "PUSHS GF@_t3\n");
   } else if (op == T_EQUAL) {
     emit(ctx, "EQS\n");
   } else if (op == T_NOT_EQUAL) {
@@ -570,6 +584,8 @@ static void gen_expr(GeneratorContext *ctx, ASTNode *e) {
   }
 }
 
+/* ===== příkazy ===== */
+
 /**
  * @brief Do GF@_ret uloží hodnotu výrazu jako návratovou hodnotu funkce
  *
@@ -619,7 +635,7 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
     ASTNode *init = s->data.var_assign.expression;
     gen_expr(ctx, init);
     convert(ctx, init->expr_type, s->expr_type);
-    int id = declare(ctx, s->data.var_assign.identifier);
+    int id = declare(ctx, s->data.var_assign.identifier); /* až po inicializaci */
     emit(ctx, "POPS LF@$v%d\n", id);
     break;
   }
@@ -628,7 +644,8 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
     ASTNode *rhs = s->data.var_assign.expression;
     gen_expr(ctx, rhs);
     convert(ctx, rhs->expr_type, s->expr_type);
-    emit(ctx, "POPS LF@$v%d\n", lookup(ctx, s->data.var_assign.identifier));
+    emit(ctx, "POPS LF@$v%d\n",
+         lookup(ctx, s->data.var_assign.identifier));
     break;
   }
 
@@ -690,10 +707,12 @@ static void gen_block(GeneratorContext *ctx, ASTNode *b) {
   ctx->vars_n = mark;
 }
 
+/* ===== funkce ===== */
+
 /**
  * @brief Vygeneruje definici jedné funkce
  *
- * Postup: návěští $fn_<jméno>, PUSHFRAME, očíslování parametrů,
+ * Postup: návěští $fn_<jméno>, PUSHFRAME, očíslování parametrů (0..k-1),
  * DEFVAR všech lokálních proměnných najednou, tělo funkce a nakonec
  * POPFRAME s RETURN. Hodnotu posledního výrazu těla funkce uloží do GF@_ret
  * jako návratovou hodnotu, pokud tělo nekončí výrazem, vrací se nil.
@@ -709,7 +728,7 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
   emit(ctx, "LABEL $fn_%s\nPUSHFRAME\n", fn->data.func_def.name);
 
   for (ASTNode *p = fn->data.func_def.params; p; p = p->next) {
-    declare(ctx, p->data.string_val);
+    declare(ctx, p->data.string_val); /* číslo parametru 0..k-1 */
   }
 
   /*
@@ -724,9 +743,10 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
 
   int returned = 0;
   size_t mark = ctx->vars_n;
-  for (ASTNode *s = fn->data.func_def.body->data.block.statements; s;
-       s = s->next) {
+  for (ASTNode *s = fn->data.func_def.body->data.block.statements;
+       s; s = s->next) {
     if (!s->next && is_expr(s)) {
+      /* Poslední výraz těla funkce určuje návratovou hodnotu. */
       gen_return_value(ctx, s);
       returned = 1;
     } else {
@@ -745,24 +765,32 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
   emit(ctx, "POPFRAME\nRETURN\n\n");
 }
 
+/* ===== pomocné rutiny ===== */
+
 /**
  * @brief Pomocné rutiny v IFJcode26, které se volají instrukcí CALL
  *
  * Argumenty dostávají na datovém zásobníku, výsledek na něm zanechávají.
  * Pracují s globálními proměnnými GF@_t1 až GF@_t6.
- *  - $$idiv: celočíselné dělení Int / Int zaokrouhlené k nule,
+ *  - $$idiv: celočíselné dělení Int / Int zaokrouhlené k nule (funguje, ať
+ *    IDIV zaokrouhluje k nule nebo k -inf),
+ *  - $$readint, $$readdouble: čtení čísla, při neplatném vstupu nebo EOF
+ *    vrací 0 (instrukce READ by uložila nil),
  *  - $$ord: ord(řetězec, index), mimo rozsah vrací -1,
  *  - $$substr: subStr(řetězec, začátek, konec), při špatných mezích
  *    ukončí program s kódem 40.
  */
 static const char *HELPERS =
-    /* Int / Int zaokrouhlené k nule (IDIV zaokrouhluje k -inf) */
+    /* Int / Int zaokrouhlené k nule. Zadání říká, že IDIV zaokrouhluje k -inf,
+       ale ic26int dělí k nule. Výsledek se proto upravuje podle zbytku
+       r = a - q*b: zbytek ve znaménku dělence znamená, že q je už správně. */
     "LABEL $$idiv\n"
     "POPS GF@_t2\nPOPS GF@_t1\n"
     "IDIV GF@_t3 GF@_t1 GF@_t2\n"
     "MUL GF@_t4 GF@_t3 GF@_t2\n"
-    "JUMPIFEQ $$idiv_ok GF@_t4 GF@_t1\n"
-    "LT GF@_t5 GF@_t1 int@0\nLT GF@_t6 GF@_t2 int@0\n"
+    "SUB GF@_t4 GF@_t1 GF@_t4\n"
+    "JUMPIFEQ $$idiv_ok GF@_t4 int@0\n"
+    "LT GF@_t5 GF@_t4 int@0\nLT GF@_t6 GF@_t1 int@0\n"
     "JUMPIFEQ $$idiv_ok GF@_t5 GF@_t6\n"
     "ADD GF@_t3 GF@_t3 int@1\n"
     "LABEL $$idiv_ok\nPUSHS GF@_t3\nRETURN\n\n"
@@ -787,7 +815,23 @@ static const char *HELPERS =
     "GETCHAR GF@_t5 GF@_t1 GF@_t2\nCONCAT GF@_t6 GF@_t6 GF@_t5\n"
     "ADD GF@_t2 GF@_t2 int@1\nJUMP $$sub_loop\n"
     "LABEL $$sub_end\nPUSHS GF@_t6\nRETURN\n"
-    "LABEL $$sub_err\nEXIT int@40\n\n";
+    "LABEL $$sub_err\nEXIT int@40\n\n"
+    /* readInt: při chybném vstupu a EOF vrací READ nil, IFJ26 chce 0 */
+    "LABEL $$readint\n"
+    "READ GF@_t1 int\n"
+    "TYPE GF@_t2 GF@_t1\n"
+    "JUMPIFEQ $$readint_ok GF@_t2 string@int\n"
+    "MOVE GF@_t1 int@0\n"
+    "LABEL $$readint_ok\nPUSHS GF@_t1\nRETURN\n\n"
+    /* readDouble: stejně jako readInt, náhradní hodnota je 0.0 */
+    "LABEL $$readdouble\n"
+    "READ GF@_t1 float\n"
+    "TYPE GF@_t2 GF@_t1\n"
+    "JUMPIFEQ $$readdouble_ok GF@_t2 string@float\n"
+    "MOVE GF@_t1 float@0x0p+0\n"
+    "LABEL $$readdouble_ok\nPUSHS GF@_t1\nRETURN\n\n";
+
+/* ===== vstupní bod ===== */
 
 /**
  * @brief Vygeneruje celý program v IFJcode26 z AST a vypíše ho do souboru
@@ -831,8 +875,9 @@ int generate_program(ASTNode *root, FILE *outf) {
   }
 
   emit(&ctx, ".IFJcode26\n");
-  emit(&ctx, "DEFVAR GF@_ret\nDEFVAR GF@_t1\nDEFVAR GF@_t2\nDEFVAR GF@_t3\n"
-             "DEFVAR GF@_t4\nDEFVAR GF@_t5\nDEFVAR GF@_t6\n");
+  emit(&ctx,
+       "DEFVAR GF@_ret\nDEFVAR GF@_t1\nDEFVAR GF@_t2\nDEFVAR GF@_t3\n"
+       "DEFVAR GF@_t4\nDEFVAR GF@_t5\nDEFVAR GF@_t6\n");
   emit(&ctx, "CREATEFRAME\nCALL $fn_%s\nEXIT int@0\n\n", main_name);
   sb_append_str(&ctx.out, HELPERS);
 

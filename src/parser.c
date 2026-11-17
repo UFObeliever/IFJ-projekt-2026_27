@@ -22,11 +22,21 @@ typedef struct {
   ASTNode *node;
 } StmtInfo;
 
+typedef struct {
+  const char *name;
+  f_param *params;
+  int param_count;
+  TokenType ret_type;
+  bool is_main;
+} FuncHeader;
+
 static void advance(ParserCtx *ctx);
 static int match(ParserCtx *ctx, TokenType expected);
 static int parse_prolog(ParserCtx *ctx);
+static int parse_function_header(ParserCtx *ctx, FuncHeader *h);
 static int parse_function_list(ParserCtx *ctx);
 static int parse_defsingle(ParserCtx *ctx);
+static int collect_signatures(ParserCtx *ctx);
 static int parse_statement_list(ParserCtx *ctx, int current_indent,
                                 StmtInfo *out, ASTNode **list);
 static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info);
@@ -42,6 +52,7 @@ static int parse_block(ParserCtx *ctx, int current_indent, StmtInfo *out,
                        ASTNode **blk);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
+static Token raw_token(ParserCtx *ctx, size_t idx); // added for SCIENCE!!!
 
 static ExprType expr_from_kw(TokenType t) {
   switch (t) {
@@ -68,14 +79,52 @@ static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
   *tail = n;
 }
 
-static Token fetch_token(ParserCtx *ctx) {
-  Token t;
-  if (ctx->has_peek) {
-    ctx->has_peek = false;
-    t = ctx->peek;
-  } else {
-    t = get_next_token(ctx->lexer);
+static Token raw_token(ParserCtx *ctx, size_t idx) {
+  while (idx >= ctx->tokens_len) {
+    if (ctx->tokens_len > 0) {
+      Token last = ctx->tokens[ctx->tokens_len - 1];
+      if (last.token_type == T_EOF || last.token_type == T_ERROR) {
+        return last;
+      }
+    }
+
+    if (ctx->tokens_len == ctx->tokens_cap) {
+      size_t cap = ctx->tokens_cap ? ctx->tokens_cap * 2 : 256;
+      Token *tmp = realloc(ctx->tokens, cap * sizeof(Token));
+      if (tmp == NULL) {
+        fprintf(stderr, "...");
+        exit(COMPILER_ERR);
+      }
+
+      ctx->tokens = tmp;
+      ctx->tokens_cap = cap;
+    }
+    ctx->tokens[ctx->tokens_len++] = get_next_token(ctx->lexer);
   }
+  return ctx->tokens[idx];
+}
+
+static SourceMark mark_get(const ParserCtx *ctx) {
+  SourceMark m = {ctx->pos, ctx->current_token, ctx->line_indent, ctx->at_bol};
+  return m;
+}
+
+static void mark_set(ParserCtx *ctx, const SourceMark *m) {
+  ctx->pos = m->pos;
+  ctx->current_token = m->tok;
+  ctx->line_indent = m->line_indent;
+  ctx->at_bol = m->at_bol;
+}
+
+static Token fetch_token(ParserCtx *ctx) {
+  Token t = raw_token(ctx, ctx->pos++);
+  // useless I believe ...?
+  // if (ctx->has_peek) {
+  //   ctx->has_peek = false;
+  //   t = ctx->peek;
+  // } else {
+  //   t = get_next_token(ctx->lexer);
+  // }
   if (t.token_type == T_EOL) {
     ctx->line_indent = 0;
     ctx->at_bol = true;
@@ -134,26 +183,34 @@ Token consume_token(ParserCtx *parser) {
 }
 
 Token peek_token(ParserCtx *parser) {
-  if (!parser->has_peek) {
-    Token t = get_next_token(parser->lexer);
-    while (t.token_type == T_WHITESPACE_SEP || t.token_type == T_INDENTS ||
-           t.token_type == T_TAB) {
-      t = get_next_token(parser->lexer);
-    }
-    parser->peek = t;
-    parser->has_peek = true;
+  size_t i = parser->pos;
+  Token t = raw_token(parser, i);
+  while (t.token_type == T_WHITESPACE_SEP || t.token_type == T_INDENTS ||
+         t.token_type == T_TAB) {
+    t = raw_token(parser, ++i);
   }
-  return parser->peek;
+  return t;
+}
+
+void parser_free(ParserCtx *ctx) {
+  free(ctx->tokens);
+  ctx->tokens = NULL;
+  ctx->tokens_len = ctx->tokens_cap = ctx->pos = 0;
 }
 
 int parse_program(ParserCtx *ctx) {
-  ctx->has_peek = false;
+  ctx->tokens = NULL;
+  ctx->tokens_len = 0;
+  ctx->tokens_cap = 0;
+  ctx->pos = 0;
   ctx->line_indent = 0;
   ctx->at_bol = true;
   advance_(ctx);
   TOKEN_CHEK(ctx->current_token)
   int status;
   if ((status = parse_prolog(ctx)) != 0)
+    return status;
+  if ((status = collect_signatures(ctx)) != 0)
     return status;
   if ((status = parse_function_list(ctx)) != 0)
     return status;
@@ -287,12 +344,22 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   return match(ctx, T_CLOSE_BRACKET);
 }
 
-static int parse_defsingle(ParserCtx *ctx) {
+static void free_params(f_param *params, int count) {
+  for (int i = 0; i < count; i++)
+    free(params[i].name);
+  free(params);
+}
+
+static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
   int status;
-  bool is_main = false;
+  h->name = NULL;
+  h->params = NULL;
+  h->param_count = 0;
+  h->ret_type = T_ERROR;
+  h->is_main = false;
 
   if (ctx->current_token.token_type == T_FUNC_MAIN) {
-    is_main = true;
+    h->is_main = true;
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
     if (ctx->current_token.token_type == T_EOL) {
@@ -310,38 +377,50 @@ static int parse_defsingle(ParserCtx *ctx) {
 
   if (ctx->current_token.token_type != T_IDENTIFICATOR)
     return ERR_SYNTAX;
-  const char *name = ctx->current_token.token_lexeme.lexeme;
+  h->name = ctx->current_token.token_lexeme.lexeme;
   advance(ctx);
   TOKEN_CHEK(ctx->current_token)
 
-  f_param *params = NULL;
-  int param_count = 0;
-  if ((status = parse_parameters(ctx, &params, &param_count)) != 0)
+  if ((status = parse_parameters(ctx, &h->params, &h->param_count)) != 0)
     return status;
 
-  TokenType ret_type = T_ERROR;
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
-    if ((status = parse_type(ctx, &ret_type)) != 0)
+    if ((status = parse_type(ctx, &h->ret_type)) != 0)
       return status;
   }
 
-  if ((status = match(ctx, T_ASSIGN)) != 0)
-    return status;
+  return match(ctx, T_ASSIGN);
+}
 
-  if (is_main) {
-    if (param_count > 0)
-      return STATIC_SEM_ERR;
-    if (ret_type != T_KW_UNIT)
-      return STATIC_SEM_TYPE_ERR;
-    ctx->main_count++;
-    if (ctx->main_count > 1)
-      return REDEF_FN_VAR_ERR;
-  }
+static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
+                                         size_t def_pos) {
+  symtable_entry *en = symtable_entry_init();
+  en->function = true;
+  en->declared = true;
+  en->defined = true;
+  en->type = h->ret_type;
+  en->f_param_count = h->param_count;
+  en->f_params = h->params;
+  en->body_state = BODY_PENDING;
+  en->is_main = h->is_main;
+  en->def_pos = def_pos;
+  en->body_start = mark_get(ctx);
+  smt_insert_global(&ctx->smt, (char *)h->name, en);
+  return en;
+}
+
+static int analyze_function(ParserCtx *ctx, const char *name,
+                            symtable_entry *fentry) {
+  int status = 0;
+  const TokenType ret_type = fentry->type;
+  const f_param *params = fentry->f_params;
+  const int param_count = fentry->f_param_count;
+  fentry->body_state = BODY_IN_PROGRESS;
 
   ASTNode *fnode = ast_create_node(AST_FUNC_DEF);
-  fnode->is_main = is_main;
+  fnode->is_main = fentry->is_main;
   fnode->data.func_def.name = strdup(name);
   ASTNode *ph = NULL, *pt = NULL;
   for (int i = 0; i < param_count; i++) {
@@ -351,15 +430,6 @@ static int parse_defsingle(ParserCtx *ctx) {
     list_append(&ph, &pt, p);
   }
   fnode->data.func_def.params = ph;
-
-  symtable_entry *fentry = symtable_entry_init();
-  fentry->function = true;
-  fentry->declared = true;
-  fentry->defined = true;
-  fentry->type = ret_type;
-  fentry->f_param_count = param_count;
-  fentry->f_params = params;
-  smt_insert_global(&ctx->smt, (char *)name, fentry);
 
   smt_scope_add(&ctx->smt);
   for (int i = 0; i < param_count; i++) {
@@ -426,12 +496,265 @@ static int parse_defsingle(ParserCtx *ctx) {
   if (status == 0) {
     fnode->expr_type = expr_from_kw(fentry->type);
     list_append(&ctx->funcs, &ctx->funcs_tail, fnode);
+    fentry->body_state = BODY_DONE;
+    fentry->body_end = mark_get(ctx);
   }
 
   ctx->ret_type = T_ERROR;
   smt_scope_remove(&ctx->smt);
   return status;
 }
+
+int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry) {
+  const SourceMark saved_mark = mark_get(ctx);
+  const TokenType saved_ret = ctx->ret_type;
+  const symtable saved_smt = ctx->smt;
+
+  symtable view;
+  view.size = saved_smt.size;
+  view.top = 0;
+  view.table = malloc(sizeof(avl_tree *) * (size_t)view.size);
+  if (view.table == NULL)
+    return COMPILER_ERR;
+  view.table[0] = saved_smt.table[0];
+
+  ctx->smt = view;
+  mark_set(ctx, &fentry->body_start);
+  int status = analyze_function(ctx, name, fentry);
+
+  free(ctx->smt.table);
+  ctx->smt = saved_smt;
+  ctx->ret_type = saved_ret;
+  mark_set(ctx, &saved_mark);
+  return status;
+}
+
+static void skip_function_body(ParserCtx *ctx) {
+  while (true) {
+    TokenType t = ctx->current_token.token_type;
+    if (t == T_EOF || t == T_ERROR)
+      return;
+    if ((t == T_KW_DEF || t == T_FUNC_MAIN) && ctx->line_indent == 0)
+      return;
+    advance(ctx);
+  }
+}
+
+static int collect_signatures(ParserCtx *ctx) {
+  const SourceMark start = mark_get(ctx);
+  int result = 0;
+
+  while (true) {
+    TokenType t = ctx->current_token.token_type;
+    if (t == T_EOL ||
+        (t == T_INDENTS && ctx->current_token.token_indents.count == 0)) {
+      advance(ctx);
+      continue;
+    }
+    if ((t != T_KW_DEF && t != T_FUNC_MAIN) || ctx->line_indent != 0)
+      break;
+
+    const size_t def_pos = ctx->pos - 1;
+    FuncHeader h;
+    int status = parse_function_header(ctx, &h);
+    if (status != 0) {
+      if (status == LEX_ANAL_ERR || status == ERR_SYNTAX)
+        result = status;
+      break;
+    }
+    symtable_entry *existing = NULL;
+    if (smt_search_global(&ctx->smt, (char *)h.name, &existing)) {
+      free_params(h.params, h.param_count);
+      break;
+    }
+    register_function(ctx, &h, def_pos);
+    skip_function_body(ctx);
+  }
+
+  mark_set(ctx, &start);
+  return result;
+}
+
+static int parse_defsingle(ParserCtx *ctx) {
+  int status;
+  const size_t def_pos = ctx->pos - 1;
+
+  FuncHeader h;
+  if ((status = parse_function_header(ctx, &h)) != 0)
+    return status;
+
+  if (h.is_main) {
+    if (h.param_count > 0)
+      return STATIC_SEM_ERR;
+    if (h.ret_type != T_KW_UNIT)
+      return STATIC_SEM_TYPE_ERR;
+    ctx->main_count++;
+    if (ctx->main_count > 1)
+      return REDEF_FN_VAR_ERR;
+  }
+
+  symtable_entry *fentry = NULL;
+  if (smt_search_global(&ctx->smt, (char *)h.name, &fentry)) {
+    if (fentry->body_state == BODY_NONE || fentry->def_pos != def_pos)
+      return REDEF_FN_VAR_ERR;
+    free_params(h.params, h.param_count);
+    if (fentry->body_state == BODY_DONE) {
+      mark_set(ctx, &fentry->body_end);
+      return 0;
+    }
+  } else {
+    fentry = register_function(ctx, &h, def_pos);
+  }
+
+  return analyze_function(ctx, h.name, fentry);
+}
+
+// static int parse_defsingle(ParserCtx *ctx) {
+//   int status;
+//   bool is_main = false;
+
+//   if (ctx->current_token.token_type == T_FUNC_MAIN) {
+//     is_main = true;
+//     advance(ctx);
+//     TOKEN_CHEK(ctx->current_token)
+//     if (ctx->current_token.token_type == T_EOL) {
+//       advance(ctx);
+//       TOKEN_CHEK(ctx->current_token)
+//     }
+//     if (match(ctx, T_KW_DEF) != 0)
+//       return ERR_SYNTAX;
+//   } else if (ctx->current_token.token_type == T_KW_DEF) {
+//     advance(ctx);
+//     TOKEN_CHEK(ctx->current_token)
+//   } else {
+//     return ERR_SYNTAX;
+//   }
+
+//   if (ctx->current_token.token_type != T_IDENTIFICATOR)
+//     return ERR_SYNTAX;
+//   const char *name = ctx->current_token.token_lexeme.lexeme;
+//   advance(ctx);
+//   TOKEN_CHEK(ctx->current_token)
+
+//   f_param *params = NULL;
+//   int param_count = 0;
+//   if ((status = parse_parameters(ctx, &params, &param_count)) != 0)
+//     return status;
+
+//   TokenType ret_type = T_ERROR;
+//   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
+//     advance(ctx);
+//     TOKEN_CHEK(ctx->current_token)
+//     if ((status = parse_type(ctx, &ret_type)) != 0)
+//       return status;
+//   }
+
+//   if ((status = match(ctx, T_ASSIGN)) != 0)
+//     return status;
+
+//   if (is_main) {
+//     if (param_count > 0)
+//       return STATIC_SEM_ERR;
+//     if (ret_type != T_KW_UNIT)
+//       return STATIC_SEM_TYPE_ERR;
+//     ctx->main_count++;
+//     if (ctx->main_count > 1)
+//       return REDEF_FN_VAR_ERR;
+//   }
+
+//   ASTNode *fnode = ast_create_node(AST_FUNC_DEF);
+//   fnode->is_main = is_main;
+//   fnode->data.func_def.name = strdup(name);
+//   ASTNode *ph = NULL, *pt = NULL;
+//   for (int i = 0; i < param_count; i++) {
+//     ASTNode *p = ast_create_node(AST_IDENTIFIER);
+//     p->data.string_val = strdup(params[i].name);
+//     p->expr_type = expr_from_kw(params[i].type);
+//     list_append(&ph, &pt, p);
+//   }
+//   fnode->data.func_def.params = ph;
+
+//   symtable_entry *fentry = symtable_entry_init();
+//   fentry->function = true;
+//   fentry->declared = true;
+//   fentry->defined = true;
+//   fentry->type = ret_type;
+//   fentry->f_param_count = param_count;
+//   fentry->f_params = params;
+//   smt_insert_global(&ctx->smt, (char *)name, fentry);
+
+//   smt_scope_add(&ctx->smt);
+//   for (int i = 0; i < param_count; i++) {
+//     symtable_entry *pe = symtable_entry_init();
+//     pe->type = params[i].type;
+//     pe->declared = true;
+//     pe->defined = true;
+//     pe->value = true;
+//     smt_insert(&ctx->smt, params[i].name, pe);
+//   }
+//   ctx->ret_type = ret_type;
+
+//   if (ctx->current_token.token_type == T_EOL) {
+//     StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+//     status = parse_block(ctx, 0, &info, &fnode->data.func_def.body);
+//     if (status == 0) {
+//       TokenType t = ctx->current_token.token_type;
+//       if (t == T_ERROR)
+//         status = LEX_ANAL_ERR;
+//       else if (t != T_EOF &&
+//                (ctx->line_indent != 0 || (t != T_FUNC_MAIN && t !=
+//                T_KW_DEF)))
+//         status = ERR_SYNTAX;
+//     }
+//     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
+//         !info.returns &&
+//         !(info.kind == SK_EXPR && types_compatible(ret_type, info.type)))
+//       status = STATIC_SEM_TYPE_ERR;
+//     if (status == 0 && ret_type == T_ERROR) {
+//       if (info.returns)
+//         status = STATIC_SEM_TYPE_ERR;
+//       else if (info.kind == SK_EXPR) {
+//         TokenType inf = kw_from_expr_type(info.type);
+//         if (info.type == EXPR_TYPE_BOOL || inf == T_ERROR)
+//           status = STATIC_SEM_TYPE_ERR;
+//         else
+//           fentry->type = inf;
+//       } else
+//         fentry->type = T_KW_UNIT;
+//     }
+//   } else {
+//     ExprType body_type = EXPR_TYPE_UNKNOWN;
+//     ASTNode *e = NULL;
+//     status = parse_expression(ctx, &e, &body_type);
+//     if (status == 0) {
+//       fnode->data.func_def.body = ast_create_node(AST_BLOCK);
+//       fnode->data.func_def.body->data.block.statements = e;
+//     }
+//     if (status == 0 && ctx->current_token.token_type != T_EOL &&
+//         ctx->current_token.token_type != T_EOF)
+//       status = (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
+//                                                           : ERR_SYNTAX;
+//     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
+//         !types_compatible(ret_type, body_type))
+//       status = STATIC_SEM_TYPE_ERR;
+//     if (status == 0 && ret_type == T_ERROR) {
+//       TokenType inferred = kw_from_expr_type(body_type);
+//       if (body_type == EXPR_TYPE_BOOL || inferred == T_ERROR)
+//         status = STATIC_SEM_TYPE_ERR;
+//       else
+//         fentry->type = inferred;
+//     }
+//   }
+
+//   if (status == 0) {
+//     fnode->expr_type = expr_from_kw(fentry->type);
+//     list_append(&ctx->funcs, &ctx->funcs_tail, fnode);
+//   }
+
+//   ctx->ret_type = T_ERROR;
+//   smt_scope_remove(&ctx->smt);
+//   return status;
+// }
 
 static int parse_statement_list(ParserCtx *ctx, int current_indent,
                                 StmtInfo *out, ASTNode **list) {

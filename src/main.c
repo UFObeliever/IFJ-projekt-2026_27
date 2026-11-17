@@ -26,5 +26,6 @@ int main(void) {
   smt_dispose(&parser.smt);
 
   lexer_free(&lexer_ctx);
+  parser_free(&parser);
   return result;
 }
