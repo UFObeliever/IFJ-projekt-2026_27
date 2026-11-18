@@ -1609,6 +1609,97 @@ else
 """ + NL), stdin="150\n", out="velke\n")
 
 
+# ============================================================================= 14 CONTROL (jednořádková těla, for)
+c = "14_control"
+gen(c, "jednoradkove_if_else", main("""\
+var i = 0
+while i < 4 do
+  if i / 2 * 2 == i then print("s") else print("l")
+  i = i + 1
+"""), out="slsl")
+gen(c, "jednoradkovy_else_if_retez", prog("""\
+def f(x: Int): Unit =
+  if x < 0 then print("n") else if x == 0 then print("z") else print("p")
+""", "f(0 - 2)\nf(0)\nf(2)\n"), out="nzp")
+gen(c, "jednoradkovy_while", main("var i = 1\nwhile i < 100 do i = i * 3\n" + show("i")), out="243\n")
+gen(c, "for_to_a_until", main("""\
+for i <- 1 to 3 do print(i)
+print(" ")
+for i <- 1 until 3 do print(i)
+""" + NL), out="123 12\n")
+gen(c, "for_kladny_a_zaporny_krok", main("""\
+for i <- 0 to 10 by 4 do print(i)
+print(" ")
+for i <- 10 to 0 by -4 do print(i)
+""" + NL), out="048 1062\n")
+gen(c, "for_prazdny_rozsah", main("""\
+for i <- 3 to 1 do print(i)
+for i <- 3 until 3 do print(i)
+for i <- 1 to 3 by -1 do print(i)
+print("x")
+""" + NL), out="x\n")
+gen(c, "for_meze_se_vyhodnoti_jednou", prog("""\
+def mez(n: Int): Int =
+  print("m")
+  n
+""", """\
+for i <- mez(1) to mez(3) by mez(1) do print(i)
+""" + NL), out="mmm123\n")
+gen(c, "for_zmena_meze_v_tele_nema_vliv", main("""\
+var n = 3
+for i <- 1 to n do
+  n = n + 1
+  print(i)
+print(" ")
+print(n)
+""" + NL), out="123 6\n")
+gen(c, "for_straze_viceradkove", main("""\
+val limit = 10
+for
+  i <- 0 until limit
+  if i != 3
+  if i < 8
+do
+  print(i)
+""" + NL), out="0124567\n")
+gen(c, "for_straz_jednoradkova", main("for i <- 1 to 12 if i / 3 * 3 == i do print(i)\n" + NL), out="36912\n")
+gen(c, "for_vnorene_nasobilka", main("""\
+for i <- 1 to 3 do
+  for j <- 1 to 3 do
+    val p = i * j
+    print(p)
+    print(" ")
+  print("\\n")
+"""), out="1 2 3 \n2 4 6 \n3 6 9 \n")
+gen(c, "for_soucet_ve_funkci", prog("""\
+def sum(n: Int): Int =
+  var s = 0
+  for k <- 1 to n do s = s + k
+  s
+""", "val a = sum(100)\n" + show("a")), out="5050\n")
+gen(c, "for_promenna_prekryje_vnejsi", main("""\
+val i = 100
+for i <- 0 until 3 do print(i)
+print(" ")
+print(i)
+""" + NL), out="012 100\n")
+gen(c, "for_promenny_krok", main("val s = 3\nfor i <- 1 to 10 by s do print(i)\n" + NL), out="14710\n")
+gen(c, "for_nulovy_krok_za_behu", main("""\
+val s = 0
+print("a")
+for i <- 1 to 3 by s do print(i)
+print("b")
+"""), out="a", run=40)
+gen(c, "fizzbuzz_for", main("""\
+for i <- 1 to 15 do
+  if i / 15 * 15 == i then print("FizzBuzz")
+  else if i / 3 * 3 == i then print("Fizz")
+  else if i / 5 * 5 == i then print("Buzz")
+  else print(i)
+  print(" ")
+"""), out="1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz ")
+
+
 # ============================================================================= zápis
 def write_generator():
     if os.path.isdir(GEN_DIR):

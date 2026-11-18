@@ -76,6 +76,7 @@ C15 = "15_cele_programy"
 C16 = "16_paramlists"
 C17 = "17_if_bez_else"
 C18 = "18_boolean_hodnoty"
+C19 = "19_control"
 
 # =============================================================== 01 prolog
 c = C1
@@ -996,7 +997,7 @@ else if 2 < 3 then
 """))
 add(c, "else_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse\n  val c = 1"))
 add(c, "else_if_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse if 2 < 3 then\n  val c = 1"))
-add(c, "prikaz_za_else_na_radku", 2, B("if 1 < 2 then\n  val a = 1\nelse val b = 1"))
+add(c, "ok_prikaz_za_else_na_radku_control", 0, B("if 1 < 2 then\n  val a = 1\nelse val b = 1"))
 
 
 # =============================================================== 18 Boolean jako hodnota (BOOLTHEN)
@@ -1040,6 +1041,67 @@ add(c, "unarni_minus_na_boolean", 6, B("val b = 1 < 2\nval c = -b"))
 add(c, "relace_na_boolean", 6, B("val b = 1 < 2\nval c = b < b"))
 add(c, "rovnost_boolean_a_int", 6, B("val b = 1 < 2\nval c = b == 1"))
 add(c, "podminka_int_promenna", 6, B('val x = 1\nif x then\n  print("x")'))
+
+
+# =============================================================== 19 CONTROL (jednořádková těla, for)
+c = C19
+add(c, "ok_if_jednoradkove_then_else", 0, B('val x = 1\nif x < 0 then print("n") else print("p")'))
+add(c, "ok_if_jednoradkove_then_bez_else", 0, B('val x = 1\nif x > 0 then print("p")'))
+add(c, "ok_if_jednoradkove_then_else_na_dalsim_radku", 0, B('val x = 1\nif x < 0 then print("n")\nelse print("p")'))
+add(c, "ok_if_blok_then_jednoradkove_else", 0, B('val x = 1\nif x < 0 then\n  print("n")\nelse print("p")'))
+add(c, "ok_if_jednoradkove_then_blok_else", 0, B('val x = 1\nif x < 0 then print("n")\nelse\n  print("p")'))
+add(c, "ok_else_if_na_jednom_radku", 0, B('val x = 0\nif x < 0 then print("n") else if x == 0 then print("z") else print("p")'))
+add(c, "ok_vnorene_jednoradkove_if", 0, B('val x = 1\nif x > 0 then if x > 5 then print("a") else print("b")'))
+add(c, "ok_jednoradkove_return", 0, FB("def f(x: Int): Int =\n  if x < 0 then return 0 else return x", "print(f(3))"))
+add(c, "ok_while_jednoradkove", 0, B("var i = 0\nwhile i < 3 do i = i + 1\nprint(i)"))
+add(c, "ok_for_to", 0, B("for i <- 1 to 3 do\n  print(i)"))
+add(c, "ok_for_until", 0, B("for i <- 0 until 3 do\n  print(i)"))
+add(c, "ok_for_by", 0, B("for i <- 1 to 10 by 3 do\n  print(i)"))
+add(c, "ok_for_zaporny_krok", 0, B("for i <- 10 to 1 by -3 do\n  print(i)"))
+add(c, "ok_for_until_by", 0, B("for i <- 0 until 10 by 5 do print(i)"))
+add(c, "ok_for_jednoradkove_telo", 0, B("for i <- 1 to 3 do print(i)"))
+add(c, "ok_for_prazdny_rozsah", 0, B("for i <- 5 to 1 do print(i)"))
+add(c, "ok_for_vyrazy_v_mezich", 0, B("val n = 4\nfor i <- n - 3 to n * 2 by n / 2 do print(i)"))
+add(c, "ok_for_jednoradkova_straz", 0, B("for i <- 1 to 10 if i / 2 * 2 == i do print(i)"))
+add(c, "ok_for_vice_strazi_jednoradkove", 0, B("for i <- 1 to 10 if i > 2 if i < 6 do print(i)"))
+add(c, "ok_for_viceradkovy", 0, B("""\
+val limit = 10
+for
+  i <- 0 until limit
+  if i != 3
+  if i < 8
+do
+  print(i)
+"""))
+add(c, "ok_for_viceradkovy_jednoradkove_telo", 0, B("for\n  i <- 1 to 3\ndo print(i)"))
+add(c, "ok_for_vnorene", 0, B("for i <- 1 to 3 do\n  for j <- 1 to i do\n    print(j)"))
+add(c, "ok_for_v_if", 0, B("val x = 1\nif x > 0 then\n  for i <- 1 to 2 do print(i)"))
+add(c, "ok_if_v_for_jednoradkove", 0, B("for i <- 1 to 5 do if i == 3 then print(i)"))
+add(c, "ok_for_promenna_prekryje_vnejsi", 0, B("val i = 100\nfor i <- 0 until 2 do print(i)\nprint(i)"))
+add(c, "ok_for_mez_pouziva_vnejsi_promennou_stejneho_jmena", 0, B("val i = 3\nfor i <- 0 until i do print(i)"))
+add(c, "ok_for_promenny_krok", 0, B("val s = 2\nfor i <- 1 to 5 by s do print(i)"))
+add(c, "ok_for_na_konci_funkce", 0, FB("def f(n: Int) =\n  for i <- 1 to n do print(i)", "f(2)"))
+add(c, "ok_for_v_unit_funkci", 0, FB("def f(n: Int): Unit =\n  for i <- 1 to n do print(i)", "f(2)"))
+add(c, "nulovy_krok_literal", 10, B("for i <- 1 to 3 by 0 do print(i)"))
+add(c, "nulovy_krok_zaporny_literal", 10, B("for i <- 1 to 3 by -0 do print(i)"))
+add(c, "zapis_do_ridici_promenne", 7, B("for i <- 1 to 3 do\n  i = 5"))
+add(c, "ridici_promenna_mimo_cyklus", 3, B("for i <- 1 to 3 do print(i)\nprint(i)"))
+add(c, "double_mez", 6, B("for i <- 1 to 2.5 do print(i)"))
+add(c, "retezcova_mez", 6, B('for i <- "a" to "c" do print(i)'))
+add(c, "double_krok", 6, B("for i <- 1 to 5 by 0.5 do print(i)"))
+add(c, "straz_neni_boolean", 6, B("for i <- 1 to 3 if i do print(i)"))
+add(c, "chybi_do", 2, B("for i <- 1 to 3\n  print(i)"))
+add(c, "chybi_sipka", 2, B("for i 1 to 3 do print(i)"))
+add(c, "chybi_to", 2, B("for i <- 1 3 do print(i)"))
+add(c, "by_bez_hodnoty", 2, B("for i <- 1 to 5 by do print(i)"))
+add(c, "dva_generatory_viceradkove", 2, B("for\n  i <- 1 to 3\n  j <- 1 to 3\ndo\n  print(i)"))
+add(c, "straz_neni_zarovnana", 2, B("for\n  i <- 1 to 3\n   if i != 2\ndo\n  print(i)"))
+add(c, "generator_neni_odsazen", 2, B("for\ni <- 1 to 3\ndo\n  print(i)"))
+add(c, "do_jinak_odsazene_nez_for", 2, B("for\n  i <- 1 to 3\n do\n  print(i)"))
+add(c, "prazdne_jednoradkove_telo", 2, B("for i <- 1 to 3 do"))
+add(c, "if_then_bez_tela", 2, B("val x = 1\nif x > 0 then"))
+add(c, "while_do_bez_tela", 2, B("var i = 0\nwhile i < 3 do"))
+add(c, "dva_else", 2, B('val x = 1\nif x < 0 then print("a") else print("b") else print("c")'))
 
 
 # =============================================================== zápis na disk
