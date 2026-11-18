@@ -1,7 +1,7 @@
 #Makefile
 CC := gcc
-CFLAGS := -Wall -Wextra  -DNDEBUG -O3 #release
-DEBUG_FLAGS := -Wall -Wextra  -g
+CFLAGS := -std=c2x -Wall -Wextra -DNDEBUG -O3 #release
+DEBUG_FLAGS := -std=c2x -Wall -Wextra -g
 BUILD_DIR = build
 DOCDIR := doc
 
