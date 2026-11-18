@@ -464,14 +464,6 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
   if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function) {
     DEBUG_LOG("DEBUG: lexeme not found!: %s\n", name);
     return UNDEF_FN_ERR;
-
-    /*
-    dva způsoby jak to vyřešit:
-    1) přejít přes vstup -> hledat a parsovat jenom definice funkcí, uložit do
-sym table (na výstupu bude pole tokenů zo vstupu) , jednoduchší    2) vyřešit to
-částí sémantické analýzy, že nějaké funkce mohou být definované později,
-náročnejší
-    */
   }
   CONSUME_TOKEN_GUARD(parser)
   CONSUME_TOKEN_GUARD(parser)

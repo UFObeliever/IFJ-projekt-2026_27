@@ -394,7 +394,6 @@ static void gen_call(GeneratorContext *ctx, ASTNode *c) {
     }
   }
 
-  /* Vytvoří rámec a přesune do něj argumenty odzadu. */
   emit(ctx, "CREATEFRAME\n");
   for (int i = n - 1; i >= 0; i--) {
     emit(ctx, "DEFVAR TF@$v%d\nPOPS TF@$v%d\n", i, i);
@@ -449,20 +448,12 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
   } else if (op == T_GT) {
     emit(ctx, "GTS\n");
   } else if (op == T_LTE) {
-    /*
-     * x <= y je (x < y) OR (x == y).
-     * NOT (x > y) není ekvivalentní pro NaN: NOT(false) by dalo true.
-     */
     emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
               "LT GF@_t3 GF@_t1 GF@_t2\n"
               "EQ GF@_t4 GF@_t1 GF@_t2\n"
               "OR GF@_t3 GF@_t3 GF@_t4\n"
               "PUSHS GF@_t3\n");
   } else if (op == T_GTE) {
-    /*
-     * x >= y je (x > y) OR (x == y).
-     * I zde zůstává výsledek pro NaN false.
-     */
     emit(ctx, "POPS GF@_t2\nPOPS GF@_t1\n"
               "GT GF@_t3 GF@_t1 GF@_t2\n"
               "EQ GF@_t4 GF@_t1 GF@_t2\n"
@@ -593,8 +584,7 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
     ASTNode *init = s->data.var_assign.expression;
     gen_expr(ctx, init);
     convert(ctx, init->expr_type, s->expr_type);
-    int id =
-        declare(ctx, s->data.var_assign.identifier); /* až po inicializaci */
+    int id = declare(ctx, s->data.var_assign.identifier);
     emit(ctx, "POPS LF@$v%d\n", id);
     break;
   }
@@ -651,7 +641,7 @@ static void gen_stmt(GeneratorContext *ctx, ASTNode *s) {
  * @param b: uzel AST_BLOCK, může být NULL
  */
 static void gen_block(GeneratorContext *ctx, ASTNode *b) {
-  size_t mark = ctx->vars_n; /* konec bloku = konec platnosti jeho proměnných */
+  size_t mark = ctx->vars_n;
 
   if (b) {
     for (ASTNode *s = b->data.block.statements; s; s = s->next) {
@@ -685,11 +675,6 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
   for (ASTNode *p = fn->data.func_def.params; p; p = p->next) {
     declare(ctx, p->data.string_val);
   }
-
-  /*
-   * Všechny DEFVAR se vypíší na začátku funkce, aby se deklarace
-   * uvnitř cyklu neopakovaly při každé iteraci.
-   */
   int param_count = count_list(fn->data.func_def.params);
   int total_decls = param_count + count_decls(fn->data.func_def.body);
   for (int i = param_count; i < total_decls; i++) {
@@ -730,8 +715,6 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
  *  - $$substr: při neplatných mezích ukončí program kódem 40.
  */
 static const char *HELPERS =
-    /* Int / Int se zaokrouhlením k nule. Výsledek IDIV upraví podle zbytku
-       r = a - q*b, protože interprety mohou zaokrouhlovat odlišně. */
     "LABEL $$idiv\n"
     "POPS GF@_t2\nPOPS GF@_t1\n"
     "IDIV GF@_t3 GF@_t1 GF@_t2\n"
