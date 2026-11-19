@@ -176,24 +176,15 @@ void lexer_init(LexerCtx *ctx, FILE *input);
 void lexer_free(LexerCtx *ctx);
 
 /**
- * @brief funkce která kontroluje zda identifikátor není keyword
- *
- * @param ctx: Kontext bufferu
- */
-Token keyword_check(const LexerCtx *ctx);
-
-/**
  * @brief Makes a string from token type enum
  */
 const char *token_type_to_string(TokenType token);
 
-Token lex_equal(LexerCtx *ctx);
+Token lex_numbers(LexerCtx *ctx);
 
-Token lex_compare_l(LexerCtx *ctx);
+Token lex_string(LexerCtx *ctx);
 
-Token lex_compare_g(LexerCtx *ctx);
-
-Token lex_not_equal(LexerCtx *ctx);
+Token lex_main_func(LexerCtx *ctx);
 
 void print_token(const Token *token);
 

@@ -119,7 +119,7 @@ Token keyword_check(const LexerCtx *ctx) {
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
 }
 
-Token lex_white_space(LexerCtx *ctx) {
+static Token lex_white_space(LexerCtx *ctx) {
   int num_indents = 0;
   State current_state = S_INDENT_START;
   while (1) {
@@ -162,7 +162,7 @@ Token lex_white_space(LexerCtx *ctx) {
   }
 }
 
-Token lex_identificator(LexerCtx *ctx) {
+static Token lex_identificator(LexerCtx *ctx) {
   State current_state = S_START;
   while (1) {
     int c = fgetc(ctx->input);
@@ -502,7 +502,7 @@ Token lex_string(LexerCtx *ctx) {
   }
 }
 
-Token lex_div_com(LexerCtx *ctx) {
+static Token lex_div_com(LexerCtx *ctx) {
   State current_state = S_BACKSLASH_COMM;
   int comment_nesting = 0;
   while (1) {
@@ -645,18 +645,7 @@ Token lex_div_com(LexerCtx *ctx) {
   }
 }
 
-int skip_white_space(LexerCtx *ctx) {
-  while (1) {
-    int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
-    if (c == ' ' || c == '\r' || c == '\t') {
-      continue;
-    }
-    return c;
-  }
-}
-
-Token lex_equal(LexerCtx *ctx) {
+static Token lex_equal(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
@@ -668,7 +657,7 @@ Token lex_equal(LexerCtx *ctx) {
   }
 }
 
-Token lex_compare_lesser(LexerCtx *ctx) {
+static Token lex_compare_lesser(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
@@ -680,7 +669,7 @@ Token lex_compare_lesser(LexerCtx *ctx) {
   }
 }
 
-Token lex_compare_greater(LexerCtx *ctx) {
+static Token lex_compare_greater(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
   DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
