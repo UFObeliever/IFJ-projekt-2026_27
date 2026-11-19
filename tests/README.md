@@ -1,6 +1,6 @@
 # Testy parseru IFJ26 (základní zadání)
 
-471 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
+503 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
 
 ## Spuštění
 
@@ -38,6 +38,7 @@ Pády (SIGABRT z `assert`, SIGSEGV) a timeouty se hlásí odděleně.
 | 13_komentare_retezce | komentáře (vnořené, víceřádkové), escape sekvence, `"""` řetězce |
 | 14_zatez | hluboké závorky (limit `PrecedenceStack` 256), dlouhé výrazy, 300 funkcí… |
 | 15_cele_programy | příklady ze zadání a pár reálných programů |
+| 16_paramlists | rozšíření PARAMLISTS: funkce bez seznamu parametrů, více seznamů, chyby 4/5/6 |
 
 ## Co testy nepokrývají
 

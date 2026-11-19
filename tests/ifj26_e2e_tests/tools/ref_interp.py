@@ -297,13 +297,14 @@ class ExprParser:
             return ("lit", v)
         if k == "ID":
             if self.c.is_op("("):
-                self.c.next()
                 args = []
-                while not self.c.is_op(")"):
-                    args.append(self.equality())
-                    if self.c.is_op(","):
-                        self.c.next()
-                self.c.expect_op(")")
+                while self.c.is_op("("):
+                    self.c.next()
+                    while not self.c.is_op(")"):
+                        args.append(self.equality())
+                        if self.c.is_op(","):
+                            self.c.next()
+                    self.c.expect_op(")")
                 return ("call", v, args)
             return ("var", v)
         if (k, v) == ("OP", "("):
@@ -365,16 +366,17 @@ class Parser:
         c = Cur(toks)
         c.expect_kw("def")
         name = c.ident()
-        c.expect_op("(")
         params = []
-        while not c.is_op(")"):
-            pn = c.ident()
-            c.expect_op(":")
-            pt = c.type()
-            params.append((pn, pt))
-            if c.is_op(","):
-                c.next()
-        c.expect_op(")")
+        while c.is_op("("):
+            c.next()
+            while not c.is_op(")"):
+                pn = c.ident()
+                c.expect_op(":")
+                pt = c.type()
+                params.append((pn, pt))
+                if c.is_op(","):
+                    c.next()
+            c.expect_op(")")
         ret = None
         if c.is_op(":"):
             c.next()
@@ -582,7 +584,12 @@ class Interp:
         if k == "lit":
             return e[1]
         if k == "var":
-            return env.lookup(e[1])[0]
+            try:
+                return env.lookup(e[1])[0]
+            except IFJError:
+                if e[1] in self.funcs:
+                    return self.call(e[1], [])
+                raise
         if k == "neg":
             v = self.eval(e[1], env)
             if not is_num(v):

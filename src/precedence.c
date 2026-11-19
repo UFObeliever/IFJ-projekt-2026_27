@@ -458,6 +458,14 @@ static void skip_eols(ParserCtx *parser) {
     (void)consume_token(parser);
 }
 
+static int list_size(const symtable_entry *fn, int i) {
+  if (i >= fn->f_list_count)
+    return -1;
+  if (fn->f_list_sizes == NULL)
+    return fn->f_param_count;
+  return fn->f_list_sizes[i];
+}
+
 static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
@@ -467,72 +475,77 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
     return UNDEF_FN_ERR;
   }
   CONSUME_TOKEN_GUARD(parser)
-  CONSUME_TOKEN_GUARD(parser)
 
-  int argc = 0;
   Error deferred = SUCCESS;
   ASTNode *head = NULL, *tail = NULL; // ja
-  skip_eols(parser);
+  int lists = 0;
+  int offset = 0;
 
-  if (parser->current_token.token_type == T_ERROR)
-    return LEX_ANAL_ERR;
-  if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+  while (parser->current_token.token_type == T_OPEN_BRACKET) {
+    const int expected = list_size(fn, lists);
+    int argc = 0;
     CONSUME_TOKEN_GUARD(parser)
-  } else {
-    while (true) {
-      ExprType at = EXPR_TYPE_UNKNOWN;
-      // ja
-      ASTNode *arg = NULL;
-      Error err = parse_expression(parser, &arg, &at);
-      if (err != SUCCESS)
-        return err;
-      if (tail)
-        tail->next = arg;
-      else
-        head = arg;
-      tail = arg;
-      if (argc >= fn->f_param_count ||
-          !arg_type_ok(fn->f_params[argc].type, at))
-        deferred = STATIC_SEM_ERR;
-      argc++;
-      /*Error err = parse_expression(parser, NULL, &at);
-      if (err != SUCCESS)
-        return err;
-      if (argc >= fn->f_param_count ||
-          !arg_type_ok(fn->f_params[argc].type, at))
-        deferred = STATIC_SEM_ERR;
-      argc++;*/
+    skip_eols(parser);
 
-      skip_eols(parser);
+    if (parser->current_token.token_type == T_ERROR)
+      return LEX_ANAL_ERR;
+    if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+      CONSUME_TOKEN_GUARD(parser)
+    } else {
+      while (true) {
+        ExprType at = EXPR_TYPE_UNKNOWN;
+        // ja
+        ASTNode *arg = NULL;
+        Error err = parse_expression(parser, &arg, &at);
+        if (err != SUCCESS)
+          return err;
+        if (tail)
+          tail->next = arg;
+        else
+          head = arg;
+        tail = arg;
+        if (argc >= expected ||
+            !arg_type_ok(fn->f_params[offset + argc].type, at))
+          deferred = STATIC_SEM_ERR;
+        argc++;
 
-      TokenType t = parser->current_token.token_type;
-      if (t == T_ERROR)
-        return LEX_ANAL_ERR;
-      if (t == T_COMMA) {
-        CONSUME_TOKEN_GUARD(parser)
-        t = parser->current_token.token_type;
+        skip_eols(parser);
+
+        TokenType t = parser->current_token.token_type;
         if (t == T_ERROR)
           return LEX_ANAL_ERR;
-        if (t == T_CLOSE_BRACKET)
-          return SYN_ANAL_ERR;
-        skip_eols(parser);
-        if (parser->current_token.token_type == T_ERROR)
-          return LEX_ANAL_ERR;
-        if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+        if (t == T_COMMA) {
+          CONSUME_TOKEN_GUARD(parser)
+          t = parser->current_token.token_type;
+          if (t == T_ERROR)
+            return LEX_ANAL_ERR;
+          if (t == T_CLOSE_BRACKET)
+            return SYN_ANAL_ERR;
+          skip_eols(parser);
+          if (parser->current_token.token_type == T_ERROR)
+            return LEX_ANAL_ERR;
+          if (parser->current_token.token_type == T_CLOSE_BRACKET) {
+            CONSUME_TOKEN_GUARD(parser)
+            break;
+          }
+          continue;
+        }
+        if (t == T_CLOSE_BRACKET) {
           CONSUME_TOKEN_GUARD(parser)
           break;
         }
-        continue;
+        return SYN_ANAL_ERR;
       }
-      if (t == T_CLOSE_BRACKET) {
-        CONSUME_TOKEN_GUARD(parser)
-        break;
-      }
-      return SYN_ANAL_ERR;
     }
+
+    if (argc != expected)
+      deferred = STATIC_SEM_ERR;
+    if (expected > 0)
+      offset += expected;
+    lists++;
   }
 
-  if (argc != fn->f_param_count)
+  if (lists != fn->f_list_count)
     deferred = STATIC_SEM_ERR;
   if (deferred != SUCCESS)
     return deferred;
@@ -691,8 +704,14 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       DEBUG_LOG("[DEBUG] branch: OPERAND token %d\n", lookahead.token_type);
       ASTNode *leaf = NULL;
       ExprType t = expr_type_from_token(lookahead.token_type);
-      bool is_call = lookahead.token_type == T_IDENTIFICATOR &&
-                     peek_token(parser).token_type == T_OPEN_BRACKET;
+      bool is_call = false;
+      if (lookahead.token_type == T_IDENTIFICATOR) {
+        symtable_entry *sym = NULL;
+        is_call = peek_token(parser).token_type == T_OPEN_BRACKET ||
+                  (smt_search(&parser->smt,
+                              (char *)lookahead.token_lexeme.lexeme, &sym) &&
+                   sym->function);
+      }
 
       if (is_call) {
         Error err = parse_call(parser, &t, &leaf);

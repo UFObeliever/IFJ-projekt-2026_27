@@ -26,6 +26,8 @@ typedef struct {
   const char *name;
   f_param *params;
   int param_count;
+  int list_count;
+  int *list_sizes;
   TokenType ret_type;
   bool is_main;
 } FuncHeader;
@@ -278,8 +280,6 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
 
 static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   int status;
-  *params = NULL;
-  *count = 0;
 
   if ((status = match(ctx, T_OPEN_BRACKET)) != 0)
     return status;
@@ -349,6 +349,8 @@ static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
   h->name = NULL;
   h->params = NULL;
   h->param_count = 0;
+  h->list_count = 0;
+  h->list_sizes = NULL;
   h->ret_type = T_ERROR;
   h->is_main = false;
 
@@ -375,8 +377,17 @@ static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
   advance(ctx);
   TOKEN_CHEK(ctx->current_token)
 
-  if ((status = parse_parameters(ctx, &h->params, &h->param_count)) != 0)
-    return status;
+  while (ctx->current_token.token_type == T_OPEN_BRACKET) {
+    const int before = h->param_count;
+    if ((status = parse_parameters(ctx, &h->params, &h->param_count)) != 0)
+      return status;
+    int *tmp =
+        realloc(h->list_sizes, sizeof(int) * (size_t)(h->list_count + 1));
+    if (tmp == NULL)
+      return COMPILER_ERR;
+    h->list_sizes = tmp;
+    h->list_sizes[h->list_count++] = h->param_count - before;
+  }
 
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
@@ -397,6 +408,8 @@ static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
   en->type = h->ret_type;
   en->f_param_count = h->param_count;
   en->f_params = h->params;
+  en->f_list_count = h->list_count;
+  en->f_list_sizes = h->list_sizes;
   en->body_state = BODY_PENDING;
   en->is_main = h->is_main;
   en->def_pos = def_pos;
@@ -559,6 +572,7 @@ static int collect_signatures(ParserCtx *ctx) {
     symtable_entry *existing = NULL;
     if (smt_search_global(&ctx->smt, (char *)h.name, &existing)) {
       free_params(h.params, h.param_count);
+      free(h.list_sizes);
       break;
     }
     register_function(ctx, &h, def_pos);
@@ -592,6 +606,7 @@ static int parse_defsingle(ParserCtx *ctx) {
     if (fentry->body_state == BODY_NONE || fentry->def_pos != def_pos)
       return REDEF_FN_VAR_ERR;
     free_params(h.params, h.param_count);
+    free(h.list_sizes);
     if (fentry->body_state == BODY_DONE) {
       mark_set(ctx, &fentry->body_end);
       return 0;
@@ -870,10 +885,6 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
   if (!smt_search(&ctx->smt, (char *)name, &entry)) {
     free(id);
     return UNDEF_FN_ERR;
-  }
-  if (entry->function) {
-    free(id);
-    return STATIC_SEM_TYPE_ERR;
   }
   if (!entry->variable) {
     free(id);

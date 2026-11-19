@@ -1371,6 +1371,68 @@ while i < 13 do
 """ + show("r")), out="1594323\n")
 
 
+# ============================================================================= 11 PARAMLISTS
+c = "11_paramlists"
+gen(c, "bez_seznamu_jednoduche", prog("def answer: Int = 42", "val x = answer\n" + show("x")), out="42\n")
+gen(c, "bez_seznamu_ve_vyrazu", prog("def two: Int = 2", "val x = two * 10 + two\n" + show("x")), out="22\n")
+gen(c, "bez_seznamu_telo_se_vyhodnoti_pri_kazdem_pouziti", prog("""\
+def line: String = readLine()
+""", """\
+val a = line
+val b = line
+print(b)
+print(a)
+"""), stdin="prvni\ndruhy\n", out="druhy\nprvni\n")
+gen(c, "bez_seznamu_vedlejsi_efekt_pri_kazdem_volani", prog("""\
+def tick: Int =
+  print("t")
+  1
+""", """\
+val x = tick + tick + tick
+""" + NL + show("x")), out="ttt\n3\n")
+gen(c, "bez_seznamu_jako_prikaz", prog('def hello: Unit = print("ahoj\\n")', "hello\nhello\n"), out="ahoj\nahoj\n")
+gen(c, "bez_seznamu_jako_argument", prog("def five: Int = 5", "print(five)\n" + NL), out="5\n")
+gen(c, "spec_priklad", PRO + dd("""\
+def answer: Int = 42
+def answerWithParens(): Int = 42
+def add(a: Int)(b: Int)(c: Int): Int = a + b + c
+def offset()(value: Int): Int = value + 1
+
+@main def run(): Unit =
+  val x = answer
+  val y = answerWithParens()
+  val sum = add(x)(y)(1)
+  val result = offset()(sum)
+  print(result)
+"""), out="86")
+gen(c, "dva_seznamy_poradi_parametru", prog("def sub(a: Int)(b: Int): Int = a - b", "val x = sub(10)(3)\n" + show("x")), out="7\n")
+gen(c, "vice_parametru_v_seznamech", prog("""\
+def f(a: Int, b: Int)(c: Int, d: Int): Int = a * 1000 + b * 100 + c * 10 + d
+""", "val x = f(1, 2)(3, 4)\n" + show("x")), out="1234\n")
+gen(c, "ruzne_typy_v_seznamech", prog("""\
+def f(n: Int)(d: Double)(s: String): String =
+  val a = toStr(n)
+  val b = toStr(d)
+  s + a + " " + b
+""", 'val r = f(7)(1.5)("x=")\n' + show("r")), out="x=7 1.50\n")
+gen(c, "poradi_vyhodnoceni_argumentu", prog("""\
+def say(n: Int): Int =
+  print(n)
+  n
+def f(a: Int)(b: Int)(c: Int): Int = a + b + c
+""", "val x = f(say(1))(say(2))(say(3))\n" + NL + show("x")), out="123\n6\n")
+gen(c, "rekurze_akumulator", prog("""\
+def fact(n: Int)(acc: Int): Int =
+  if n <= 1 then
+    return acc
+  else
+    return fact(n - 1)(acc * n)
+""", "val x = fact(10)(1)\n" + show("x")), out="3628800\n")
+gen(c, "vnorene_volani", prog("def add(a: Int)(b: Int): Int = a + b",
+                              "val x = add(add(1)(2))(add(3)(4))\n" + show("x")), out="10\n")
+gen(c, "promenna_prekryje_funkci", prog("def answer: Int = 42", "val answer = 7\n" + show("answer")), out="7\n")
+
+
 # ============================================================================= zápis
 def write_generator():
     if os.path.isdir(GEN_DIR):

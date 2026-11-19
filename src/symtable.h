@@ -36,6 +36,8 @@ typedef struct symtable_entry {
   bool value;
   int f_param_count;
   f_param *f_params;
+  int f_list_count;
+  int *f_list_sizes;
   BodyState body_state;
   bool is_main;
   size_t def_pos;
