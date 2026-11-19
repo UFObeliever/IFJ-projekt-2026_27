@@ -466,6 +466,10 @@ static int list_size(const symtable_entry *fn, int i) {
   return fn->f_list_sizes[i];
 }
 
+static Error finish_call(ParserCtx *parser, const char *name,
+                         symtable_entry *fn, ASTNode *recv, ExprType *out_type,
+                         ASTNode **out_node);
+
 static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
@@ -475,11 +479,17 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
     return UNDEF_FN_ERR;
   }
   CONSUME_TOKEN_GUARD(parser)
+  return finish_call(parser, name, fn, NULL, out_type, out_node);
+}
 
+// pro přepis z a.toString() -> toString(a)
+static Error finish_call(ParserCtx *parser, const char *name,
+                         symtable_entry *fn, ASTNode *recv, ExprType *out_type,
+                         ASTNode **out_node) {
   Error deferred = SUCCESS;
-  ASTNode *head = NULL, *tail = NULL; // ja
+  ASTNode *head = recv, *tail = recv; // ja
   int lists = 0;
-  int offset = 0;
+  int offset = recv ? 1 : 0;
 
   while (parser->current_token.token_type == T_OPEN_BRACKET) {
     const int expected = list_size(fn, lists);
@@ -578,6 +588,42 @@ static char *strip_us(const char *s) {
   return r;
 }
 
+static bool is_builtin_member(const char *m, ExprType t) {
+  if (!strcmp(m, "toString"))
+    return true;
+  if (!strcmp(m, "toInt") || !strcmp(m, "floor"))
+    return t == EXPR_TYPE_DOUBLE;
+  if (!strcmp(m, "length"))
+    return t == EXPR_TYPE_STRING;
+  return false;
+}
+
+// klíč rozšiřující metody v tabulce symbolů jako je"Typ$metoda"
+static char *ext_method_key(ExprType t, const char *m) {
+  const char *tn;
+  switch (t) {
+  case EXPR_TYPE_INT:
+    tn = "Int";
+    break;
+  case EXPR_TYPE_DOUBLE:
+    tn = "Double";
+    break;
+  case EXPR_TYPE_STRING:
+    tn = "String";
+    break;
+  case EXPR_TYPE_UNIT:
+    tn = "Unit";
+    break;
+  default:
+    return NULL;
+  }
+  size_t len = strlen(tn) + 1 + strlen(m) + 1;
+  char *key = malloc(len);
+  if (key != NULL)
+    snprintf(key, len, "%s$%s", tn, m);
+  return key;
+}
+
 static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
   while (p->current_token.token_type == T_DOT) {
     CONSUME_TOKEN_GUARD(p)
@@ -591,6 +637,25 @@ static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
     ASTNode *recv = NULL;
     if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &recv))
       return SYN_ANAL_ERR;
+
+    if (!is_builtin_member(m, t)) {
+      char *key = ext_method_key(t, m);
+      symtable_entry *ext = NULL;
+      if (key != NULL && smt_search_global(&p->smt, key, &ext) &&
+          ext->function) {
+        CONSUME_TOKEN_GUARD(p)
+        ExprType rt = EXPR_TYPE_UNKNOWN;
+        ASTNode *call = NULL;
+        Error e = finish_call(p, key, ext, recv, &rt, &call);
+        free(key);
+        if (e != SUCCESS)
+          return e;
+        if (!tstack_push(ts, rt) || !ast_stack_push(as, call))
+          return COMPILER_ERR;
+        continue;
+      }
+      free(key);
+    }
 
     const char *fn;
     ExprType res;

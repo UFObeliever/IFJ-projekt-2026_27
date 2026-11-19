@@ -186,6 +186,7 @@ Token keyword_check(const LexerCtx *ctx) {
   KEYWORD_CHECK(T_KW_VAL, "val");
   KEYWORD_CHECK(T_KW_VAR, "var");
   KEYWORD_CHECK(T_KW_WHILE, "while");
+  KEYWORD_CHECK(T_EXTENSION, "extension");
   KEYWORD_CHECK(T_KW_IFJ26, "ifj26");
 
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
@@ -1130,7 +1131,7 @@ static Token lex_token(LexerCtx *ctx) {
   if (c == '.') {
     int c2 = fgetc(ctx->input);
     ungetc(c2, ctx->input);
-    if (isdigit(c2) || c2 == 'D' || c2 == 'd') {
+    if (isdigit(c2)) {
       ungetc(c, ctx->input);
       return lex_numbers(ctx);
     }
@@ -1239,6 +1240,7 @@ static const char *token_to_string_table[] = {
     [T_SEMICOLON] = "T_SEMICOLON",
     [T_KW_IFJ26] = "T_KW_IFJ26",
     [T_TAB] = "T_TAB",
+    [T_EXTENSION] = "T_EXTENSION",
 };
 
 const char *token_type_to_string(TokenType token) {
@@ -1297,6 +1299,7 @@ void print_token(const Token *token) {
   case T_FUNC_MAIN:
   case T_DOT:
   case T_KW_IFJ26:
+  case T_EXTENSION:
   case T_TAB:
     printf("Token {type = %s}", token_type_str);
     break;

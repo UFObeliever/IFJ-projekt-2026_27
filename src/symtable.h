@@ -41,6 +41,7 @@ typedef struct symtable_entry {
   BodyState body_state;
   bool is_main;
   size_t def_pos;
+  int def_indent;
   SourceMark body_start;
   SourceMark body_end;
 } symtable_entry;
