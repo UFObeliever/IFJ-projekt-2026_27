@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define TYPE_STACK_MAX 256
 #define PREC_STACK_MAX                                                         \
@@ -564,6 +565,61 @@ static char *strip_us(const char *s) {
   return r;
 }
 
+static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
+  while (p->current_token.token_type == T_DOT) {
+    CONSUME_TOKEN_GUARD(p)
+    if (p->current_token.token_type == T_ERROR)
+      return LEX_ANAL_ERR;
+    if (p->current_token.token_type != T_IDENTIFICATOR)
+      return SYN_ANAL_ERR;
+
+    const char *m = p->current_token.token_lexeme.lexeme;
+    ExprType t = EXPR_TYPE_UNKNOWN;
+    ASTNode *recv = NULL;
+    if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &recv))
+      return SYN_ANAL_ERR;
+
+    const char *fn;
+    ExprType res;
+    bool known = (t != EXPR_TYPE_UNKNOWN);
+    if (!strcmp(m, "toString")) {
+      fn = "toStr";
+      res = EXPR_TYPE_STRING;
+      if (t == EXPR_TYPE_BOOL)
+        return STATIC_SEM_TYPE_ERR;
+    } else if (!strcmp(m, "toInt")) {
+      fn = "toInt";
+      res = EXPR_TYPE_INT;
+      if (known && t != EXPR_TYPE_DOUBLE)
+        return STATIC_SEM_TYPE_ERR;
+    } else if (!strcmp(m, "floor")) {
+      fn = "$floor";
+      res = EXPR_TYPE_DOUBLE;
+      if (known && t != EXPR_TYPE_DOUBLE)
+        return STATIC_SEM_TYPE_ERR;
+    } else if (!strcmp(m, "length")) {
+      fn = "strLength";
+      res = EXPR_TYPE_INT;
+      if (known && t != EXPR_TYPE_STRING)
+        return STATIC_SEM_TYPE_ERR;
+    } else {
+      return UNDEF_FN_ERR;
+    }
+
+    ASTNode *call = ast_create_node(AST_FUNC_CALL);
+    if (!call)
+      return COMPILER_ERR;
+    call->data.func_call.name = strdup(fn);
+    call->data.func_call.arguments = recv;
+    call->expr_type = res;
+    if (!tstack_push(ts, res) || !ast_stack_push(as, call))
+      return COMPILER_ERR;
+
+    CONSUME_TOKEN_GUARD(p)
+  }
+  return SUCCESS;
+}
+
 static Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
                                    ExprType *out_type);
 
@@ -671,6 +727,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         CONSUME_TOKEN_GUARD(parser);
       }
       expect_operand = false;
+      Error merr = apply_member(parser, &tstack, &ast_stack);
+      if (merr != SUCCESS)
+        return merr;
       Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
       if (uerr != SUCCESS)
         return uerr;
@@ -707,6 +766,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
           }
           CONSUME_TOKEN_GUARD(parser);
           expect_operand = false;
+          Error merr = apply_member(parser, &tstack, &ast_stack);
+          if (merr != SUCCESS)
+            return merr;
           Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
           if (uerr != SUCCESS)
             return uerr;
@@ -746,6 +808,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         }
         CONSUME_TOKEN_GUARD(parser);
         expect_operand = false;
+        Error merr = apply_member(parser, &tstack, &ast_stack);
+        if (merr != SUCCESS)
+          return merr;
         Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
         if (uerr != SUCCESS)
           return uerr;

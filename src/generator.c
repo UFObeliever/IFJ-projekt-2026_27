@@ -356,6 +356,8 @@ static void gen_builtin(GeneratorContext *ctx, ASTNode *c) {
     emit(ctx, "CALL $$ord\n");
   } else if (!strcmp(name, "subStr")) {
     emit(ctx, "CALL $$substr\n");
+  } else if (!strcmp(name, "$floor")) {
+    emit(ctx, "CALL $$floor\n");
   } else {
     ctx->failed = 1;
   }
@@ -756,7 +758,15 @@ static const char *HELPERS =
     "TYPE GF@_t2 GF@_t1\n"
     "JUMPIFEQ $$readdouble_ok GF@_t2 string@float\n"
     "MOVE GF@_t1 float@0x0p+0\n"
-    "LABEL $$readdouble_ok\nPUSHS GF@_t1\nRETURN\n\n";
+    "LABEL $$readdouble_ok\nPUSHS GF@_t1\nRETURN\n\n"
+    "LABEL $$floor\n"
+    "POPS GF@_t1\n"
+    "FLOAT2INT GF@_t2 GF@_t1\n"
+    "INT2FLOAT GF@_t3 GF@_t2\n"
+    "GT GF@_t4 GF@_t3 GF@_t1\n"
+    "JUMPIFEQ $$floor_ok GF@_t4 bool@false\n"
+    "SUB GF@_t3 GF@_t3 float@0x1p+0\n"
+    "LABEL $$floor_ok\nPUSHS GF@_t3\nRETURN\n\n";
 
 /**
  * @brief Vygeneruje program IFJcode26 z AST a zapíše ho do souboru
