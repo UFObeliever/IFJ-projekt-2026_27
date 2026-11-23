@@ -411,6 +411,8 @@ class Parser:
             return [self.if_stmt(toks, ind)]
         if toks[0] == ("KW", "while"):
             return [self.while_stmt(toks, ind)]
+        if toks[0] == ("ID", "for"):
+            return [self.for_stmt(toks, ind)]
         parts, cur, depth = [], [], 0
         for t in toks:
             if t == ("OP", "("):
@@ -427,28 +429,90 @@ class Parser:
 
     def if_stmt(self, toks, ind):
         idx = toks.index(("KW", "then"))
-        if idx != len(toks) - 1:
-            raise IFJError("za then nesmí nic následovat (základní zadání)")
         cond = parse_expr(toks[1:idx])
-        then_b = self.block(ind)
-        else_b = []
-        if (self.i < len(self.lines) and self.lines[self.i][0] == ind
+        rest = toks[idx + 1:]
+        else_rest = None
+        if rest:
+            level = 0
+            for j, t in enumerate(rest):
+                if t == ("KW", "if"):
+                    level += 1
+                elif t == ("KW", "else"):
+                    if level == 0:
+                        rest, else_rest = rest[:j], rest[j + 1:]
+                        break
+                    level -= 1
+            then_b = self.line(rest, ind)
+        else:
+            then_b = self.block(ind)
+        if (else_rest is None and self.i < len(self.lines) and self.lines[self.i][0] == ind
                 and self.lines[self.i][1][:1] == [("KW", "else")]):
-            rest = self.lines[self.i][1][1:]
+            else_rest = self.lines[self.i][1][1:]
             self.i += 1
-            if not rest:
-                else_b = self.block(ind)
-            elif rest[0] == ("KW", "if"):
-                else_b = [self.if_stmt(rest, ind)]
-            else:
-                raise IFJError("za else nesmí nic následovat")
+        if else_rest is None:
+            else_b = []
+        elif not else_rest:
+            else_b = self.block(ind)
+        elif else_rest[0] == ("KW", "if"):
+            else_b = [self.if_stmt(else_rest, ind)]
+        else:
+            else_b = self.line(else_rest, ind)
         return ("if", cond, then_b, else_b)
 
     def while_stmt(self, toks, ind):
         idx = toks.index(("KW", "do"))
-        if idx != len(toks) - 1:
-            raise IFJError("za do nesmí nic následovat (základní zadání)")
-        return ("while", parse_expr(toks[1:idx]), self.block(ind))
+        rest = toks[idx + 1:]
+        body = self.line(rest, ind) if rest else self.block(ind)
+        return ("while", parse_expr(toks[1:idx]), body)
+
+    def for_stmt(self, toks, ind):
+        header = toks[1:]
+        if not header:
+            header = []
+            gen_ind = None
+            while self.i < len(self.lines) and self.lines[self.i][0] > ind:
+                if gen_ind is None:
+                    gen_ind = self.lines[self.i][0]
+                if self.lines[self.i][0] != gen_ind:
+                    raise IFJError("generátor a stráže musí být zarovnané")
+                header += self.lines[self.i][1]
+                self.i += 1
+            if self.i >= len(self.lines) or self.lines[self.i][0] != ind \
+                    or self.lines[self.i][1][:1] != [("KW", "do")]:
+                raise IFJError("chybí do")
+            header += self.lines[self.i][1]
+            self.i += 1
+        var = header[0][1]
+        if header[1:3] != [("OP", "<"), ("OP", "-")]:
+            raise IFJError("očekáváno <-")
+        parts, cur, kinds = [], [], ["from"]
+        depth = 0
+        rest = header[3:]
+        for j, t in enumerate(rest):
+            if t == ("OP", "("):
+                depth += 1
+            elif t == ("OP", ")"):
+                depth -= 1
+            if depth == 0 and t in (("ID", "to"), ("ID", "until"), ("ID", "by"), ("KW", "if"), ("KW", "do")):
+                parts.append(cur)
+                cur = []
+                if t == ("KW", "do"):
+                    rest = rest[j + 1:]
+                    break
+                kinds.append(t[1])
+            else:
+                cur.append(t)
+        exprs = dict()
+        guards = []
+        for kind, part in zip(kinds, parts):
+            if kind == "if":
+                guards.append(parse_expr(part))
+            else:
+                exprs[kind] = parse_expr(part)
+        inclusive = "to" in exprs
+        end = exprs["to"] if inclusive else exprs["until"]
+        body = self.line(rest, ind) if rest else self.block(ind)
+        return ("for", var, exprs["from"], end, exprs.get("by"), inclusive, guards, body)
 
     def simple(self, toks):
         c = Cur(toks)
@@ -765,6 +829,23 @@ class Interp:
                 if not cond:
                     return UNIT
                 self.run_block(s[2], env)
+        if k == "for":
+            start = self.eval(s[2], env)
+            end = self.eval(s[3], env)
+            step = 1 if s[4] is None else self.eval(s[4], env)
+            if step == 0:
+                raise RunError(40, "nulový krok")
+            i = start
+            while (i - end) * step < 0 or (s[5] and i == end):
+                self.steps += 1
+                if self.steps > self.MAX_STEPS:
+                    raise IFJError("příliš mnoho kroků (nekonečný cyklus?)")
+                scope = Env(env)
+                scope.define(s[1], i, "Int", False)
+                if all(self.eval(g, scope) for g in s[6]):
+                    self.run_block(s[7], scope)
+                i += step
+            return UNIT
         if k == "return":
             raise ReturnEx(UNIT if s[1] is None else self.eval(s[1], env))
         if k == "expr":

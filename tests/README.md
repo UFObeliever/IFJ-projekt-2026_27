@@ -1,6 +1,6 @@
 # Testy parseru IFJ26 (základní zadání)
 
-567 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
+616 testů v `tests/<kategorie>/<nn>_<popis>.rc<kód>.scala`. Zdrojáky jsou čisté ASCII.
 
 ## Spuštění
 
@@ -41,6 +41,7 @@ Pády (SIGABRT z `assert`, SIGSEGV) a timeouty se hlásí odděleně.
 | 16_paramlists | rozšíření PARAMLISTS: funkce bez seznamu parametrů, více seznamů, chyby 4/5/6 |
 | 17_if_bez_else | rozšíření BOOLTHEN (část parseru): `if` bez `else`, `else if`, chyby 2/3/6 |
 | 18_boolean_hodnoty | rozšíření BOOLTHEN (část parseru): Boolean v proměnných, parametrech a návratových hodnotách, `==` nad Boolean, neasociativní relace, chyby 2/5/6 |
+| 19_control | rozšíření CONTROL (část parseru): jednořádková těla `if`/`else`/`while`, cyklus `for` (`to`, `until`, `by`, stráže, víceřádkový zápis), chyby 2/3/6/7/10 |
 
 ## Co testy nepokrývají
 

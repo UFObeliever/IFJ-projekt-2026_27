@@ -60,6 +60,10 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent,
 static int parse_return_statement(ParserCtx *ctx, StmtInfo *info);
 static int parse_block(ParserCtx *ctx, int current_indent, StmtInfo *out,
                        ASTNode **blk);
+static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
+                      ASTNode **blk);
+static int parse_for_statement(ParserCtx *ctx, int current_indent,
+                               StmtInfo *info);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
 static Token raw_token(ParserCtx *ctx, size_t idx); // added for SCIENCE!!!
@@ -88,6 +92,8 @@ static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
     (*tail)->next = n;
   else
     *head = n;
+  while (n->next)
+    n = n->next;
   *tail = n;
 }
 
@@ -869,7 +875,8 @@ static int end_of_simple_statement(ParserCtx *ctx, int status) {
     return 0;
   }
   if (ctx->current_token.token_type != T_EOL &&
-      ctx->current_token.token_type != T_EOF)
+      ctx->current_token.token_type != T_EOF &&
+      ctx->current_token.token_type != T_KW_ELSE)
     return ERR_SYNTAX;
   return 0;
 }
@@ -887,6 +894,8 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   case T_KW_RETURN:
     return end_of_simple_statement(ctx, parse_return_statement(ctx, info));
   case T_IDENTIFICATOR:
+    if (strcmp(ctx->current_token.token_lexeme.lexeme, "for") == 0)
+      return parse_for_statement(ctx, current_indent, info);
     if (peek_token(ctx).token_type == T_ASSIGN)
       return end_of_simple_statement(ctx, parse_assignment(ctx, info));
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
@@ -1155,14 +1164,18 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
   if ((status = match(ctx, T_KW_THEN)) != 0)
     return status;
 
-  if ((status = parse_block(ctx, current_indent, &then_info,
-                            &n->data.if_stmt.body)) != 0)
+  bool inline_then = ctx->current_token.token_type != T_EOL;
+  if ((status = parse_body(ctx, current_indent, &then_info,
+                           &n->data.if_stmt.body)) != 0)
     return status;
 
-  while (ctx->current_token.token_type == T_EOL)
-    advance(ctx);
-  bool has_else = ctx->current_token.token_type == T_KW_ELSE &&
-                  ctx->line_indent == current_indent;
+  bool has_else = inline_then && ctx->current_token.token_type == T_KW_ELSE;
+  if (!has_else) {
+    while (ctx->current_token.token_type == T_EOL)
+      advance(ctx);
+    has_else = ctx->current_token.token_type == T_KW_ELSE &&
+               ctx->line_indent == current_indent;
+  }
   if (has_else) {
     if ((status = match(ctx, T_KW_ELSE)) != 0)
       return status;
@@ -1171,8 +1184,8 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
         return status;
       n->data.if_stmt.else_body = ast_create_node(AST_BLOCK);
       n->data.if_stmt.else_body->data.block.statements = else_info.node;
-    } else if ((status = parse_block(ctx, current_indent, &else_info,
-                                     &n->data.if_stmt.else_body)) != 0) {
+    } else if ((status = parse_body(ctx, current_indent, &else_info,
+                                    &n->data.if_stmt.else_body)) != 0) {
       return status;
     }
   }
@@ -1198,7 +1211,7 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent,
   if ((status = match(ctx, T_KW_DO)) != 0)
     return status;
 
-  status = parse_block(ctx, current_indent, NULL, &n->data.while_loop.body);
+  status = parse_body(ctx, current_indent, NULL, &n->data.while_loop.body);
   if (status == 0)
     info->node = n;
   return status;
@@ -1232,4 +1245,234 @@ static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out,
     (*blk)->data.block.statements = lst;
   }
   return status;
+}
+
+static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
+                      ASTNode **blk) {
+  if (ctx->current_token.token_type == T_EOL)
+    return parse_block(ctx, current_indent, out, blk);
+
+  StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+  smt_scope_add(&ctx->smt);
+  int status = parse_statement(ctx, current_indent, &info);
+  smt_scope_remove(&ctx->smt);
+  if (status != 0)
+    return status;
+  if (out)
+    *out = info;
+  *blk = ast_create_node(AST_BLOCK);
+  (*blk)->data.block.statements = info.node;
+  return 0;
+}
+
+static int for_counter = 0;
+
+static bool is_word(const ParserCtx *ctx, const char *word) {
+  return ctx->current_token.token_type == T_IDENTIFICATOR &&
+         strcmp(ctx->current_token.token_lexeme.lexeme, word) == 0;
+}
+
+static ASTNode *int_ident(const char *name) {
+  ASTNode *n = ast_create_node(AST_IDENTIFIER);
+  n->data.string_val = strdup(name);
+  n->expr_type = EXPR_TYPE_INT;
+  return n;
+}
+
+static ASTNode *int_binop(int op, ASTNode *l, ASTNode *r, ExprType t) {
+  ASTNode *n = ast_make_binop(op, l, r);
+  n->expr_type = t;
+  return n;
+}
+
+static ASTNode *int_literal(int v) {
+  ASTNode *n = ast_make_int(v);
+  n->expr_type = EXPR_TYPE_INT;
+  return n;
+}
+
+static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *e) {
+  ASTNode *n = ast_create_node(type);
+  n->data.var_assign.identifier = strdup(name);
+  n->data.var_assign.expression = e;
+  n->expr_type = EXPR_TYPE_INT;
+  return n;
+}
+
+static ASTNode *block_of(ASTNode *statements) {
+  ASTNode *b = ast_create_node(AST_BLOCK);
+  b->data.block.statements = statements;
+  return b;
+}
+
+static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **e) {
+  ExprType t = EXPR_TYPE_UNKNOWN;
+  int status = parse_expression(ctx, e, &t);
+  if (status == 0 && t != want && t != EXPR_TYPE_UNKNOWN)
+    return STATIC_SEM_TYPE_ERR;
+  return status;
+}
+
+static ASTNode *strip_unary(ASTNode *e) {
+  while (e->type == AST_UNARY_OP)
+    e = e->data.unary_op.operand;
+  return e;
+}
+
+static int parse_for_statement(ParserCtx *ctx, int current_indent,
+                               StmtInfo *info) {
+  int status;
+  advance(ctx);
+  TOKEN_CHEK(ctx->current_token)
+
+  bool multiline = ctx->current_token.token_type == T_EOL;
+  int gen_indent = current_indent;
+  if (multiline) {
+    while (ctx->current_token.token_type == T_EOL)
+      advance(ctx);
+    TOKEN_CHEK(ctx->current_token)
+    if (ctx->line_indent <= current_indent)
+      return ERR_SYNTAX;
+    gen_indent = ctx->line_indent;
+  }
+
+  if (ctx->current_token.token_type != T_IDENTIFICATOR)
+    return ERR_SYNTAX;
+  const char *var = ctx->current_token.token_lexeme.lexeme;
+  advance(ctx);
+  if ((status = match(ctx, T_LT)) != 0 ||
+      (status = match(ctx, T_MINUS_SIGN)) != 0)
+    return status;
+
+  ASTNode *from = NULL, *to = NULL, *step = NULL;
+  if ((status = parse_typed_expr(ctx, EXPR_TYPE_INT, &from)) != 0)
+    return status;
+  bool inclusive = is_word(ctx, "to");
+  if (!inclusive && !is_word(ctx, "until"))
+    return ERR_SYNTAX;
+  advance(ctx);
+  if ((status = parse_typed_expr(ctx, EXPR_TYPE_INT, &to)) != 0)
+    return status;
+  if (is_word(ctx, "by")) {
+    advance(ctx);
+    if ((status = parse_typed_expr(ctx, EXPR_TYPE_INT, &step)) != 0)
+      return status;
+    ASTNode *lit = strip_unary(step);
+    if (lit->type == AST_LITERAL_INT && lit->data.int_val == 0)
+      return ERR_OTHERS;
+  }
+
+  smt_scope_add(&ctx->smt);
+  symtable_entry *ve = symtable_entry_init();
+  ve->type = T_KW_INT;
+  ve->declared = true;
+  ve->defined = true;
+  ve->value = true;
+  smt_insert(&ctx->smt, (char *)var, ve);
+
+  ASTNode **guards = NULL;
+  int guard_count = 0;
+  while (status == 0) {
+    if (multiline) {
+      if (ctx->current_token.token_type != T_EOL) {
+        status = ERR_SYNTAX;
+        break;
+      }
+      while (ctx->current_token.token_type == T_EOL)
+        advance(ctx);
+      if (ctx->current_token.token_type == T_KW_DO &&
+          ctx->line_indent == current_indent)
+        break;
+      if (ctx->current_token.token_type != T_KW_IF ||
+          ctx->line_indent != gen_indent) {
+        status = ERR_SYNTAX;
+        break;
+      }
+    } else if (ctx->current_token.token_type == T_KW_DO) {
+      break;
+    } else if (ctx->current_token.token_type != T_KW_IF) {
+      status = ERR_SYNTAX;
+      break;
+    }
+    advance(ctx);
+    ASTNode *g = NULL;
+    if ((status = parse_typed_expr(ctx, EXPR_TYPE_BOOL, &g)) != 0)
+      break;
+    ASTNode **tmp =
+        realloc(guards, sizeof(*guards) * (size_t)(guard_count + 1));
+    if (tmp == NULL) {
+      status = COMPILER_ERR;
+      break;
+    }
+    guards = tmp;
+    guards[guard_count++] = g;
+  }
+
+  ASTNode *body = NULL;
+  if (status == 0)
+    status = match(ctx, T_KW_DO);
+  if (status == 0)
+    status = parse_body(ctx, current_indent, NULL, &body);
+  smt_scope_remove(&ctx->smt);
+  if (status != 0) {
+    free(guards);
+    return status;
+  }
+
+  char n_i[32], n_end[32], n_step[32];
+  int id = for_counter++;
+  snprintf(n_i, sizeof n_i, "$for%d_i", id);
+  snprintf(n_end, sizeof n_end, "$for%d_end", id);
+  snprintf(n_step, sizeof n_step, "$for%d_step", id);
+
+  ASTNode *core = body;
+  for (int i = guard_count - 1; i >= 0; i--)
+    core = block_of(ast_make_if(guards[i], core, NULL));
+  free(guards);
+
+  ASTNode *incr = int_store(
+      AST_ASSIGNMENT, n_i,
+      int_binop(T_PLUS_SIGN, int_ident(n_i), int_ident(n_step), EXPR_TYPE_INT));
+  ASTNode *loop_var = int_store(AST_VAR_DECL, var, int_ident(n_i));
+  loop_var->next = core->data.block.statements;
+  ASTNode *last = loop_var;
+  while (last->next)
+    last = last->next;
+  last->next = incr;
+
+  ASTNode *diff =
+      int_binop(T_MINUS_SIGN, int_ident(n_i), int_ident(n_end), EXPR_TYPE_INT);
+  ASTNode *cond =
+      int_binop(inclusive ? T_LTE : T_LT,
+                int_binop(T_MULT_SIGN, diff, int_ident(n_step), EXPR_TYPE_INT),
+                int_literal(0), EXPR_TYPE_BOOL);
+  ASTNode *loop = ast_make_while(cond, block_of(loop_var));
+
+  ASTNode *decl_i = int_store(AST_VAR_DECL, n_i, from);
+  ASTNode *decl_end = int_store(AST_VAR_DECL, n_end, to);
+  ASTNode *decl_step =
+      int_store(AST_VAR_DECL, n_step, step ? step : int_literal(1));
+  decl_i->next = decl_end;
+  decl_end->next = decl_step;
+  decl_step->next = loop;
+
+  if (step && strip_unary(step)->type != AST_LITERAL_INT) {
+    ASTNode *empty = ast_make_string(strdup(""));
+    empty->expr_type = EXPR_TYPE_STRING;
+    empty->next = int_literal(1);
+    empty->next->next = int_literal(0);
+    ASTNode *fail = ast_create_node(AST_FUNC_CALL);
+    fail->data.func_call.name = strdup("subStr");
+    fail->data.func_call.arguments = empty;
+    fail->expr_type = EXPR_TYPE_STRING;
+    ASTNode *zero =
+        int_binop(T_EQUAL, int_ident(n_step), int_literal(0), EXPR_TYPE_BOOL);
+    ASTNode *check = ast_make_if(zero, block_of(fail), NULL);
+    decl_step->next = check;
+    check->next = loop;
+  }
+
+  info->kind = SK_OTHER;
+  info->node = decl_i;
+  return 0;
 }
