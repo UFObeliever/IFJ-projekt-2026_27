@@ -240,6 +240,8 @@ class Cur:
 
     def type(self):
         k, v = self.next()
+        if (k, v) == ("ID", "Boolean"):
+            return v
         if k != "KW" or v not in TYPES:
             raise IFJError("očekáván typ, nalezeno %r" % (v,))
         return v
@@ -429,11 +431,17 @@ class Parser:
             raise IFJError("za then nesmí nic následovat (základní zadání)")
         cond = parse_expr(toks[1:idx])
         then_b = self.block(ind)
-        if self.i < len(self.lines) and self.lines[self.i] == (ind, [("KW", "else")]):
+        else_b = []
+        if (self.i < len(self.lines) and self.lines[self.i][0] == ind
+                and self.lines[self.i][1][:1] == [("KW", "else")]):
+            rest = self.lines[self.i][1][1:]
             self.i += 1
-            else_b = self.block(ind)
-        else:
-            raise IFJError("chybí else (základní zadání)")
+            if not rest:
+                else_b = self.block(ind)
+            elif rest[0] == ("KW", "if"):
+                else_b = [self.if_stmt(rest, ind)]
+            else:
+                raise IFJError("za else nesmí nic následovat")
         return ("if", cond, then_b, else_b)
 
     def while_stmt(self, toks, ind):
@@ -467,7 +475,7 @@ class Parser:
 # ------------------------------------------------------------------ vyhodnocení
 def tname(v):
     if isinstance(v, bool):
-        raise IFJError("Boolean nelze uložit (základní zadání)")
+        return "Boolean"
     if isinstance(v, int):
         return "Int"
     if isinstance(v, float):
@@ -672,7 +680,8 @@ class Interp:
             need(1, "Any")
             v = a[0]
             t = tname(v)
-            self.out.append(fmt_a(v) if t == "Double" else ("()" if t == "Unit" else str(v)))
+            self.out.append(fmt_a(v) if t == "Double" else ("()" if t == "Unit" else
+                            str(v).lower() if t == "Boolean" else str(v)))
             return UNIT
         if name == "readLine":
             need(0)
@@ -691,6 +700,8 @@ class Interp:
                 if v == int(v):
                     raise AssertionError("toStr celého Double je nejednoznačné: %r" % v)
                 return "%.2f" % v
+            if t == "Boolean":
+                return "true" if v else "false"
             return "()" if t == "Unit" else str(v)
         if name == "toInt":
             need(1, "Double")

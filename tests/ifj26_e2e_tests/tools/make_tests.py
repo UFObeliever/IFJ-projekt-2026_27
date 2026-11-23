@@ -1433,6 +1433,182 @@ gen(c, "vnorene_volani", prog("def add(a: Int)(b: Int): Int = a + b",
 gen(c, "promenna_prekryje_funkci", prog("def answer: Int = 42", "val answer = 7\n" + show("answer")), out="7\n")
 
 
+# ============================================================================= 12 if bez else, else if (BOOLTHEN)
+c = "12_if_bez_else"
+gen(c, "if_bez_else_splnena_i_nesplnena", main("""\
+val x = 5
+if x > 3 then
+  print("a")
+if x < 3 then
+  print("b")
+print("c")
+"""), out="ac")
+gen(c, "else_if_vsechny_vetve", prog("""\
+def f(x: Int): Unit =
+  if x < 0 then
+    print("zaporne ")
+  else if x == 0 then
+    print("nula ")
+  else if x < 10 then
+    print("male ")
+  else
+    print("velke ")
+""", "f(0 - 1)\nf(0)\nf(5)\nf(50)\n"), out="zaporne nula male velke ")
+gen(c, "else_if_bez_else_zadna_vetev", prog("""\
+def f(x: Int): Unit =
+  if x < 0 then
+    print("n")
+  else if x == 0 then
+    print("z")
+""", "f(1)\nf(0)\nf(0 - 1)\n"), out="zn")
+gen(c, "vnitrni_if_bez_else_vnejsi_else", main("""\
+var a = 1
+var b = 1
+var i = 0
+while i < 3 do
+  if a == 1 then
+    if b == 1 then
+      print("x")
+  else
+    print("y")
+  b = b + 1
+  a = a + 1
+  i = i + 1
+"""), out="xyy")
+gen(c, "if_bez_else_v_cyklu", main("""\
+var i = 0
+var s = 0
+while i < 10 do
+  if i / 2 * 2 == i then
+    s = s + i
+  i = i + 1
+""" + show("s")), out="20\n")
+gen(c, "else_if_retez_se_vyhodnocuje_zleva", prog("""\
+def say(n: Int): Int =
+  print(n)
+  n
+""", """\
+val a = say(1)
+if a > 5 then
+  print("A")
+else if a > 3 then
+  print("B")
+else if a > 0 then
+  print("C")
+else
+  print("D")
+""" + NL), out="1C\n")
+gen(c, "return_ve_vetvich_else_if", prog("""\
+def sign(x: Int): Int =
+  if x < 0 then
+    return 0 - 1
+  else if x == 0 then
+    return 0
+  else
+    return 1
+""", """\
+val a = sign(0 - 7)
+val b = sign(0)
+val c = sign(7)
+""" + show("a", "b", "c")), out="-1\n0\n1\n")
+gen(c, "if_bez_else_s_return_a_pokracovani", prog("""\
+def clamp(x: Int): Int =
+  if x < 0 then
+    return 0
+  if x > 10 then
+    return 10
+  x
+""", """\
+val a = clamp(0 - 3)
+val b = clamp(4)
+val c = clamp(30)
+""" + show("a", "b", "c")), out="0\n4\n10\n")
+gen(c, "promenne_ve_vetvich_else_if", main("""\
+val x = 2
+if x == 1 then
+  val t = "jedna"
+  print(t)
+else if x == 2 then
+  val t = "dva"
+  print(t)
+else
+  val t = "jine"
+  print(t)
+""" + NL), out="dva\n")
+gen(c, "fizzbuzz_else_if", main("""\
+var i = 1
+while i <= 15 do
+  if i / 15 * 15 == i then
+    print("FizzBuzz")
+  else if i / 3 * 3 == i then
+    print("Fizz")
+  else if i / 5 * 5 == i then
+    print("Buzz")
+  else
+    print(i)
+  print(" ")
+  i = i + 1
+"""), out="1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz ")
+
+
+# ============================================================================= 13 Boolean jako hodnota (BOOLTHEN)
+c = "13_boolean_hodnoty"
+gen(c, "print_boolean", main("val a = 1 < 2\nval b = 1 > 2\nprint(a)\nprint(\" \")\nprint(b)\n" + NL), out="true false\n")
+gen(c, "var_boolean_se_meni", main("""\
+var b = 1 < 2
+print(b)
+b = 1 == 2
+print(b)
+""" + NL), out="truefalse\n")
+gen(c, "boolean_rizeni_cyklu", main("""\
+var i = 0
+var go = i < 5
+while go do
+  i = i + 1
+  go = i < 5
+""" + show("i")), out="5\n")
+gen(c, "funkce_vraci_boolean", prog("def even(n: Int): Boolean = n / 2 * 2 == n", """\
+var i = 0
+while i < 6 do
+  if even(i) then
+    print(i)
+  i = i + 1
+""" + NL), out="024\n")
+gen(c, "boolean_parametr", prog("""\
+def choose(b: Boolean, x: Int, y: Int): Int =
+  if b then
+    return x
+  else
+    return y
+""", "val a = choose(3 > 2, 10, 20)\nval b = choose(3 < 2, 10, 20)\n" + show("a", "b")), out="10\n20\n")
+gen(c, "rovnost_boolean_hodnot", main("""\
+val t = 1 < 2
+val f = 1 > 2
+val a = t == t
+val b = t == f
+val c = t != f
+val d = f != f
+""" + show("a", "b", "c", "d")), out="true\nfalse\ntrue\nfalse\n")
+gen(c, "rovnost_ma_nizsi_prioritu_nez_relace", main("""\
+val t = 1 < 2
+val x = 5
+val a = t == x < 10
+val b = x > 10 == t
+""" + show("a", "b")), out="true\nfalse\n")
+gen(c, "odvozeny_typ_boolean", prog("def inRange(x: Int, lo: Int, hi: Int) = lo <= x == x <= hi", """\
+val a = inRange(5, 1, 10)
+val b = inRange(0, 1, 10)
+""" + show("a", "b")), out="true\nfalse\n")
+gen(c, "boolean_ze_vstupu", main("""\
+val n = readInt()
+val big = n > 100
+if big then
+  print("velke")
+else
+  print("male")
+""" + NL), stdin="150\n", out="velke\n")
+
+
 # ============================================================================= zápis
 def write_generator():
     if os.path.isdir(GEN_DIR):

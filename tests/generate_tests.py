@@ -74,6 +74,8 @@ C13 = "13_komentare_retezce"
 C14 = "14_zatez"
 C15 = "15_cele_programy"
 C16 = "16_paramlists"
+C17 = "17_if_bez_else"
+C18 = "18_boolean_hodnoty"
 
 # =============================================================== 01 prolog
 c = C1
@@ -238,8 +240,8 @@ add(c, "else_vic_odsazeny_nez_if", 2,
     B("var a = 0\nif a < 1 then\n    a = 1\n  else\n    a = 2"))
 add(c, "else_mene_odsazeny_nez_if", 2,
     PRO + "\n@main def main(): Unit =\n  var a = 0\n  if a < 1 then\n    a = 1\nelse\n  a = 2\n")
-add(c, "chybi_else_v_zakladnim_zadani", 2, B("var a = 0\nif a < 1 then\n  a = 1"))
-add(c, "chybi_else_u_vnitrniho_if", 2,
+add(c, "ok_if_bez_else_boolthen", 0, B("var a = 0\nif a < 1 then\n  a = 1"))
+add(c, "ok_vnitrni_if_bez_else_boolthen", 0,
     B("var a = 0\nif a < 1 then\n  if a < 0 then\n    a = 1\nelse\n  a = 3"))
 add(c, "else_bez_if", 2, B("var a = 0\nelse\n  a = 1"))
 add(c, "dvojity_else", 2,
@@ -426,7 +428,7 @@ add(c, "prirazeni_double_do_int", 6, B("var i = 1\ni = 2.5"))
 add(c, "prirazeni_int_do_retezce", 6, B('var s = "a"\ns = 1'))
 add(c, "prirazeni_promenne_jineho_typu", 6, B('val a = 1\nvar s = "x"\ns = a'))
 add(c, "prirazeni_vyrazu_double_do_int", 6, B("var i = 1\ni = i + 1.5"))
-add(c, "pravdivostni_hodnota_do_val", "2or6", B("val b = 1 < 2"))
+add(c, "ok_pravdivostni_hodnota_do_val_boolthen", 0, B("val b = 1 < 2"))
 add(c, "pravdivostni_hodnota_do_var_s_typem", "2or6", B("var b: Int = 1 < 2"))
 add(c, "pravdivostni_hodnota_do_prirazeni", "2or6", B("var a = 0\na = 1 < 2"))
 add(c, "pravdivostni_hodnota_v_return", "2or6", F("def f(): Int =\n  return 1 < 2"))
@@ -927,6 +929,117 @@ add(c, "prirazeni_do_funkce_bez_seznamu", 7, FB("def answer: Int = 42", "answer 
 add(c, "rekurze_bez_navratoveho_typu", 6, F("def loop = loop"))
 add(c, "spatny_navratovy_typ_bez_seznamu", 6, F('def answer: Int = "x"'))
 add(c, "main_s_parametrem_ve_druhem_seznamu", 5, PRO + "\n@main def main()(a: Int): Unit =\n  val m = 0\n")
+
+
+# =============================================================== 17 if bez else, else if (BOOLTHEN)
+c = C17
+add(c, "ok_if_bez_else", 0, B("var a = 0\nif a < 1 then\n  a = 1\nprint(a)"))
+add(c, "ok_if_bez_else_na_konci_souboru", 0, B('if 1 < 2 then\n  print("x")'))
+add(c, "ok_dva_if_bez_else_za_sebou", 0, B("var a = 0\nif a < 1 then\n  a = 1\nif a < 5 then\n  a = 2\nprint(a)"))
+add(c, "ok_if_bez_else_v_cyklu", 0, B("var i = 0\nwhile i < 3 do\n  if i == 1 then\n    print(i)\n  i = i + 1"))
+add(c, "ok_vnitrni_if_bez_else_vnejsi_s_else", 0,
+    B('val a = 1\nif a == 1 then\n  if a == 2 then\n    print("x")\nelse\n  print("y")'))
+add(c, "ok_else_if", 0, B('val x = 0\nif x < 0 then\n  print("n")\nelse if x == 0 then\n  print("z")\nelse\n  print("p")'))
+add(c, "ok_else_if_bez_else", 0, B('val x = 0\nif x < 0 then\n  print("n")\nelse if x == 0 then\n  print("z")'))
+add(c, "ok_vice_else_if", 0, B("""\
+val x = 5
+if x < 0 then
+  print("a")
+else if x == 0 then
+  print("b")
+else if x < 10 then
+  print("c")
+else if x < 100 then
+  print("d")
+else
+  print("e")
+"""))
+add(c, "ok_else_if_vnorene_v_bloku", 0, B("""\
+val x = 5
+if x > 0 then
+  if x < 3 then
+    print("a")
+  else if x < 7 then
+    print("b")
+else
+  print("c")
+"""))
+add(c, "ok_if_v_else_bloku_na_dalsim_radku", 0, B('val x = 1\nif x > 2 then\n  print("a")\nelse\n  if x > 0 then\n    print("b")'))
+add(c, "ok_unit_navratovy_typ_if_bez_else", 0, FB('def f(x: Int): Unit =\n  if x < 0 then\n    print("n")', "f(1)"))
+add(c, "ok_odvozeny_unit_if_bez_else", 0, FB('def f(x: Int) =\n  if x < 0 then\n    print("n")', "f(1)"))
+add(c, "ok_return_ve_vsech_vetvich_else_if", 0, FB("""\
+def f(x: Int): Int =
+  if x < 0 then
+    return 0
+  else if x == 0 then
+    return 1
+  else
+    return 2
+""", "val r = f(0)\nprint(r)"))
+add(c, "ok_if_bez_else_a_return_za_nim", 0, FB("def f(x: Int): Int =\n  if x < 0 then\n    return 0\n  return 1", "val r = f(1)\nprint(r)"))
+add(c, "if_bez_else_na_konci_funkce_s_typem", 6, F("def f(x: Int): Int =\n  if x < 0 then\n    return 0"))
+add(c, "else_if_bez_else_na_konci_funkce_s_typem", 6,
+    F("def f(x: Int): Int =\n  if x < 0 then\n    return 0\n  else if x == 0 then\n    return 1"))
+add(c, "promenna_z_then_v_else_if", 3, B("if 1 < 2 then\n  val q = 1\nelse if 2 < 3 then\n  print(q)"))
+add(c, "promenna_z_if_bez_else_za_nim", 3, B("if 1 < 2 then\n  val q = 1\nprint(q)"))
+add(c, "else_if_bez_then", 2, B("if 1 < 2 then\n  val a = 1\nelse if 2 < 3\n  val b = 1"))
+add(c, "else_if_bez_podminky", 2, B("if 1 < 2 then\n  val a = 1\nelse if then\n  val b = 1"))
+add(c, "else_if_bez_tela", 2, B("if 1 < 2 then\n  val a = 1\nelse if 2 < 3 then\nval b = 1"))
+add(c, "else_if_podminka_neni_boolean", 6, B("if 1 < 2 then\n  val a = 1\nelse if 5 then\n  val b = 1"))
+add(c, "else_if_vic_odsazeny", 2, B("if 1 < 2 then\n  val a = 1\n else if 2 < 3 then\n  val b = 1"))
+add(c, "else_if_mene_odsazeny_nez_if", 2, R("""\
+@main def main(): Unit =
+  if 1 < 2 then
+    val a = 1
+else if 2 < 3 then
+  val b = 1
+"""))
+add(c, "else_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse\n  val c = 1"))
+add(c, "else_if_za_else", 2, B("if 1 < 2 then\n  val a = 1\nelse\n  val b = 1\nelse if 2 < 3 then\n  val c = 1"))
+add(c, "prikaz_za_else_na_radku", 2, B("if 1 < 2 then\n  val a = 1\nelse val b = 1"))
+
+
+# =============================================================== 18 Boolean jako hodnota (BOOLTHEN)
+c = C18
+add(c, "ok_val_odvozeny_boolean", 0, B("val b = 1 < 2\nprint(b)"))
+add(c, "ok_val_s_typem_boolean", 0, B("val b: Boolean = 1 >= 2\nprint(b)"))
+add(c, "ok_var_boolean_prirazeni", 0, B("var b = 1 < 2\nb = 3 == 4\nprint(b)"))
+add(c, "ok_boolean_promenna_jako_podminka_if", 0, B('val b = 2 <= 3\nif b then\n  print("y")'))
+add(c, "ok_boolean_promenna_jako_podminka_while", 0,
+    B("var i = 0\nvar go = i < 3\nwhile go do\n  i = i + 1\n  go = i < 3\nprint(i)"))
+add(c, "ok_parametr_boolean", 0, FB('def f(b: Boolean): Unit =\n  if b then\n    print("t")', "f(1 == 1)"))
+add(c, "ok_navratovy_typ_boolean", 0, FB("def even(n: Int): Boolean = n / 2 * 2 == n", "val e = even(4)\nprint(e)"))
+add(c, "ok_odvozeny_navratovy_typ_boolean", 0, FB("def pos(n: Int) = n > 0", "val p = pos(5)\nprint(p)"))
+add(c, "ok_return_boolean", 0, FB("def f(n: Int): Boolean =\n  return n != 0", "val r = f(1)\nprint(r)"))
+add(c, "ok_boolean_predany_dal", 0,
+    FB("def id(b: Boolean): Boolean = b\ndef g(n: Int): Boolean = id(n > 2)", "val r = g(5)\nprint(r)"))
+add(c, "ok_porovnani_boolean_rovnost", 0, B("val a = 1 < 2\nval b = 3 < 4\nval c = a == b\nprint(c)"))
+add(c, "ok_porovnani_boolean_nerovnost", 0, B("val a = 1 < 2\nval b = 3 > 4\nval c = a != b\nprint(c)"))
+add(c, "ok_rovnost_ma_nizsi_prioritu_nez_relace", 0, B("val b = 1 < 2\nval x = 1\nval c = b == x < 3\nprint(c)"))
+add(c, "ok_relace_vlevo_od_rovnosti", 0, B("val b = 1 < 2\nval x = 1\nval c = x < 3 == b\nprint(c)"))
+add(c, "ok_dve_relace_porovnane", 0, B("val c = 1 < 2 == 3 > 4\nprint(c)"))
+add(c, "ok_boolean_v_zavorkach_porovnany", 0, B("val a = 1 < 2\nval c = (a == a) == a\nprint(c)"))
+add(c, "ok_print_boolean_primo", 0, B("print(1 < 2)"))
+add(c, "retezeni_rovnosti_boolean", "2or6", B("val a = 1 < 2\nval c = a == a == a"))
+add(c, "retezeni_nerovnosti_boolean", "2or6", B("val a = 1 < 2\nval c = a != a != a"))
+add(c, "retezeni_relaci", "2or6", B("val c = 1 < 2 < 3"))
+add(c, "retezeni_relaci_ruznych", "2or6", B("val c = 1 <= 2 > 3"))
+add(c, "boolean_do_int_val", 6, B("val x: Int = 1 < 2"))
+add(c, "int_do_boolean_val", 6, B("val b: Boolean = 5"))
+add(c, "string_do_boolean_var", 6, B('var b: Boolean = "true"'))
+add(c, "prirazeni_int_do_boolean_var", 6, B("var b = 1 < 2\nb = 5"))
+add(c, "prirazeni_boolean_do_int_var", 6, B("var x = 1\nx = 1 < 2"))
+add(c, "boolean_argument_na_int_parametr", 5, FB("def f(a: Int): Int = a", "val r = f(1 < 2)"))
+add(c, "int_argument_na_boolean_parametr", 5, FB("def f(a: Boolean): Int = 1", "val r = f(1)"))
+add(c, "navratova_hodnota_boolean_pro_int", 6, F("def f(): Int = 1 < 2"))
+add(c, "navratova_hodnota_int_pro_boolean", 6, F("def f(): Boolean = 1"))
+add(c, "return_int_pro_boolean", 6, F("def f(): Boolean =\n  return 1"))
+add(c, "soucet_boolean_a_int", 6, B("val b = 1 < 2\nval c = b + 1"))
+add(c, "nasobeni_boolean", 6, B("val b = 1 < 2\nval c = b * b"))
+add(c, "unarni_minus_na_boolean", 6, B("val b = 1 < 2\nval c = -b"))
+add(c, "relace_na_boolean", 6, B("val b = 1 < 2\nval c = b < b"))
+add(c, "rovnost_boolean_a_int", 6, B("val b = 1 < 2\nval c = b == 1"))
+add(c, "podminka_int_promenna", 6, B('val x = 1\nif x then\n  print("x")'))
 
 
 # =============================================================== zápis na disk
