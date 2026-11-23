@@ -64,6 +64,8 @@ static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
                       ASTNode **blk);
 static int parse_for_statement(ParserCtx *ctx, int current_indent,
                                StmtInfo *info);
+static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
+                           bool as_expr);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
 static Token raw_token(ParserCtx *ctx, size_t idx); // added for SCIENCE!!!
@@ -444,6 +446,16 @@ static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
   return en;
 }
 
+/**
+ * @brief Říká, zda poslední příkaz bloku dává hodnotu
+ *
+ * Hodnotu dává výraz a také if se shodnými typy větví (CONTROL).
+ */
+static bool is_value_stmt(const StmtInfo *s) {
+  return s->kind == SK_EXPR ||
+         (s->kind == SK_IF && s->type != EXPR_TYPE_UNKNOWN);
+}
+
 static bool body_ends_here(const ParserCtx *ctx, int base_indent) {
   TokenType t = ctx->current_token.token_type;
   if (t == T_EOF)
@@ -497,12 +509,12 @@ static int analyze_function(ParserCtx *ctx, const char *name,
     }
     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
         !info.returns &&
-        !(info.kind == SK_EXPR && types_compatible(ret_type, info.type)))
+        !(is_value_stmt(&info) && types_compatible(ret_type, info.type)))
       status = STATIC_SEM_TYPE_ERR;
     if (status == 0 && ret_type == T_ERROR) {
       if (info.returns)
         status = STATIC_SEM_TYPE_ERR;
-      else if (info.kind == SK_EXPR) {
+      else if (is_value_stmt(&info)) {
         TokenType inf = kw_from_expr_type(info.type);
         if (inf == T_ERROR)
           status = STATIC_SEM_TYPE_ERR;
@@ -893,9 +905,9 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
     return parse_while_statement(ctx, current_indent, info);
   case T_KW_RETURN:
     return end_of_simple_statement(ctx, parse_return_statement(ctx, info));
+  case T_KW_FOR:
+    return parse_for_statement(ctx, current_indent, info);
   case T_IDENTIFICATOR:
-    if (strcmp(ctx->current_token.token_lexeme.lexeme, "for") == 0)
-      return parse_for_statement(ctx, current_indent, info);
     if (peek_token(ctx).token_type == T_ASSIGN)
       return end_of_simple_statement(ctx, parse_assignment(ctx, info));
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
@@ -905,6 +917,7 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   case T_KW_TRUE:
   case T_KW_FALSE:
   case T_NOT:
+  case T_MINUS_SIGN:
   case T_OPEN_BRACKET:
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   default:
@@ -1146,8 +1159,90 @@ static int parse_condition(ParserCtx *ctx, TokenType terminator,
   return 0;
 }
 
-static int parse_if_statement(ParserCtx *ctx, int current_indent,
-                              StmtInfo *info) {
+/**
+ * @brief Zjistí, zda větev if dává hodnotu, a jakého typu
+ *
+ * Ve výrazu (as_expr) má větev zakončená definicí, přiřazením nebo cyklem
+ * hodnotu () typu Unit. Větev zakončená return hodnotu nedává (nevrací se).
+ */
+static bool branch_value(const StmtInfo *b, bool as_expr, ExprType *t) {
+  switch (b->kind) {
+  case SK_EXPR:
+    *t = b->type;
+    return true;
+  case SK_IF:
+    if (b->type != EXPR_TYPE_UNKNOWN) {
+      *t = b->type;
+      return true;
+    }
+    if (as_expr && !b->returns) {
+      *t = EXPR_TYPE_UNIT;
+      return true;
+    }
+    return false;
+  case SK_OTHER:
+    if (!as_expr)
+      return false;
+    *t = EXPR_TYPE_UNIT;
+    return true;
+  default:
+    return false;
+  }
+}
+
+/**
+ * @brief Sjednotí typy dvou větví; jediná implicitní konverze je Int na Double
+ */
+static bool unify_types(ExprType a, ExprType b, ExprType *out) {
+  if (a == b || b == EXPR_TYPE_UNKNOWN) {
+    *out = a;
+    return true;
+  }
+  if (a == EXPR_TYPE_UNKNOWN) {
+    *out = b;
+    return true;
+  }
+  if ((a == EXPR_TYPE_INT && b == EXPR_TYPE_DOUBLE) ||
+      (a == EXPR_TYPE_DOUBLE && b == EXPR_TYPE_INT)) {
+    *out = EXPR_TYPE_DOUBLE;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * @brief Větev if: blok, nebo (ve výrazu) jednořádkový výraz
+ *
+ * Jednořádkový výraz ve výrazovém if nekončí příkazem, takže za ním může
+ * následovat ')' nebo ',' a nesmí tam být konec řádku.
+ */
+static int parse_branch(ParserCtx *ctx, int current_indent, StmtInfo *out,
+                        ASTNode **blk, bool as_expr) {
+  if (!as_expr || ctx->current_token.token_type == T_EOL)
+    return parse_body(ctx, current_indent, out, blk);
+
+  ExprType t = EXPR_TYPE_UNKNOWN;
+  ASTNode *e = NULL;
+  int status = parse_expression(ctx, &e, &t);
+  if (status != 0)
+    return status;
+  *blk = ast_create_node(AST_BLOCK);
+  (*blk)->data.block.statements = e;
+  out->kind = SK_EXPR;
+  out->type = t;
+  out->node = e;
+  return 0;
+}
+
+/**
+ * @brief Společná část if jako příkazu a if jako výrazu
+ *
+ * Má-li if větev else a obě větve dávají hodnotu, má i celý if hodnotu
+ * (info->type a expr_type uzlu). Ve výrazu je else povinný a typy větví
+ * se musí shodovat (chyba 6).
+ */
+static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
+                           bool as_expr) {
   int status;
   StmtInfo then_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
   StmtInfo else_info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
@@ -1156,6 +1251,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
 
   ASTNode *n = ast_create_node(AST_IF);
   n->data.if_stmt.else_body = NULL;
+  n->expr_type = EXPR_TYPE_UNKNOWN;
 
   if ((status = parse_condition(ctx, T_KW_THEN, &n->data.if_stmt.condition)) !=
       0)
@@ -1165,8 +1261,8 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
     return status;
 
   bool inline_then = ctx->current_token.token_type != T_EOL;
-  if ((status = parse_body(ctx, current_indent, &then_info,
-                           &n->data.if_stmt.body)) != 0)
+  if ((status = parse_branch(ctx, current_indent, &then_info,
+                             &n->data.if_stmt.body, as_expr)) != 0)
     return status;
 
   bool has_else = inline_then && ctx->current_token.token_type == T_KW_ELSE;
@@ -1180,19 +1276,101 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
     if ((status = match(ctx, T_KW_ELSE)) != 0)
       return status;
     if (ctx->current_token.token_type == T_KW_IF) {
-      if ((status = parse_if_statement(ctx, current_indent, &else_info)) != 0)
+      if ((status =
+               parse_if_common(ctx, current_indent, &else_info, as_expr)) != 0)
         return status;
       n->data.if_stmt.else_body = ast_create_node(AST_BLOCK);
       n->data.if_stmt.else_body->data.block.statements = else_info.node;
-    } else if ((status = parse_body(ctx, current_indent, &else_info,
-                                    &n->data.if_stmt.else_body)) != 0) {
+    } else if ((status = parse_branch(ctx, current_indent, &else_info,
+                                      &n->data.if_stmt.else_body, as_expr)) !=
+               0) {
       return status;
+    }
+  } else if (as_expr) {
+    return ERR_SYNTAX;
+  }
+
+  ExprType tt = EXPR_TYPE_UNKNOWN, et = EXPR_TYPE_UNKNOWN;
+  ExprType rt = EXPR_TYPE_UNKNOWN;
+  bool value = false;
+  if (has_else) {
+    bool tv = branch_value(&then_info, as_expr, &tt);
+    bool ev = branch_value(&else_info, as_expr, &et);
+    if (tv && ev) {
+      value = unify_types(tt, et, &rt);
+      if (!value && as_expr)
+        return STATIC_SEM_TYPE_ERR;
+    } else if (tv && else_info.returns) {
+      value = true;
+      rt = tt;
+    } else if (ev && then_info.returns) {
+      value = true;
+      rt = et;
     }
   }
 
+  n->expr_type = value ? rt : EXPR_TYPE_UNKNOWN;
   info->kind = SK_IF;
+  info->type = n->expr_type;
   info->returns = then_info.returns && has_else && else_info.returns;
   info->node = n;
+  return 0;
+}
+
+static int parse_if_statement(ParserCtx *ctx, int current_indent,
+                              StmtInfo *info) {
+  return parse_if_common(ctx, current_indent, info, false);
+}
+
+/**
+ * @brief Po if zakončeném blokem vrátí čtení na konec řádku
+ *
+ * Blok if spotřebuje konce řádků až k prvnímu tokenu dalšího řádku. Výraz
+ * i příkaz, jehož je if částí, ale na konec řádku čekají, proto se token
+ * znovu nastaví na první konec řádku před aktuálním tokenem.
+ */
+static void rewind_to_eol(ParserCtx *ctx) {
+  if (ctx->tokens_len == 0 || ctx->pos == 0)
+    return;
+  size_t i = ctx->pos - 1;
+  if (i >= ctx->tokens_len)
+    i = ctx->tokens_len - 1;
+  size_t first = 0;
+  bool found = false;
+  while (i > 0) {
+    TokenType t = ctx->tokens[i - 1].token_type;
+    if (t == T_EOL) {
+      first = i - 1;
+      found = true;
+    } else if (t != T_INDENTS && t != T_WHITESPACE_SEP && t != T_TAB) {
+      break;
+    }
+    i--;
+  }
+  if (!found)
+    return;
+  ctx->pos = first + 1;
+  ctx->current_token = ctx->tokens[first];
+  ctx->line_indent = 0;
+  ctx->at_bol = true;
+}
+
+/**
+ * @brief if jako výraz; volá ho parser výrazů na místě operandu
+ *
+ * @param ctx: kontext parseru, aktuální token je if
+ * @param out: kořen AST (uzel AST_IF s nastaveným expr_type)
+ * @param out_type: typ výsledku (ExprType)
+ * @return 0, nebo chybový kód
+ */
+int parse_if_expression(ParserCtx *ctx, ASTNode **out, int *out_type) {
+  StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
+  int status = parse_if_common(ctx, ctx->line_indent, &info, true);
+  if (status != 0)
+    return status;
+  rewind_to_eol(ctx);
+  *out = info.node;
+  *out_type = (int)info.type;
   return 0;
 }
 

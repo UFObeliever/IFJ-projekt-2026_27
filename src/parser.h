@@ -35,5 +35,6 @@ Token peek_token(ParserCtx *parser);
 int parse_program(ParserCtx *ctx);
 void parser_free(ParserCtx *ctx);
 int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry);
+int parse_if_expression(ParserCtx *ctx, ASTNode **out, int *out_type);
 
 #endif

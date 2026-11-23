@@ -251,6 +251,8 @@ static int count_list(ASTNode *p) {
  * @param block: uzel AST_BLOCK, může být NULL
  * @return počet deklarací AST_VAR_DECL
  */
+static int count_decls_expr(ASTNode *e);
+
 static int count_decls(ASTNode *block) {
   int n = 0;
   if (!block) {
@@ -261,17 +263,59 @@ static int count_decls(ASTNode *block) {
     switch (s->type) {
     case AST_VAR_DECL:
       n++;
+      n += count_decls_expr(s->data.var_assign.expression);
       break;
-    case AST_IF:
-      n += count_decls(s->data.if_stmt.body);
-      n += count_decls(s->data.if_stmt.else_body);
+    case AST_ASSIGNMENT:
+      n += count_decls_expr(s->data.var_assign.expression);
+      break;
+    case AST_RETURN:
+      n += count_decls_expr(s->data.return_stmt.expression);
       break;
     case AST_WHILE:
+      n += count_decls_expr(s->data.while_loop.condition);
       n += count_decls(s->data.while_loop.body);
       break;
     default:
+      n += count_decls_expr(s);
       break;
     }
+  }
+
+  return n;
+}
+
+/**
+ * @brief Spočítá deklarace uvnitř výrazu (bloky větví if jako výrazu)
+ *
+ * @param e: uzel výrazu nebo příkazu if, může být NULL
+ * @return počet deklarací AST_VAR_DECL
+ */
+static int count_decls_expr(ASTNode *e) {
+  int n = 0;
+  if (!e) {
+    return 0;
+  }
+
+  switch (e->type) {
+  case AST_IF:
+    n += count_decls_expr(e->data.if_stmt.condition);
+    n += count_decls(e->data.if_stmt.body);
+    n += count_decls(e->data.if_stmt.else_body);
+    break;
+  case AST_BIN_OP:
+    n += count_decls_expr(e->data.bin_op.left);
+    n += count_decls_expr(e->data.bin_op.right);
+    break;
+  case AST_UNARY_OP:
+    n += count_decls_expr(e->data.unary_op.operand);
+    break;
+  case AST_FUNC_CALL:
+    for (ASTNode *a = e->data.func_call.arguments; a; a = a->next) {
+      n += count_decls_expr(a);
+    }
+    break;
+  default:
+    break;
   }
 
   return n;
@@ -307,6 +351,8 @@ static int is_expr(ASTNode *s) {
 
 static void gen_expr(GeneratorContext *ctx, ASTNode *e);
 static void gen_block(GeneratorContext *ctx, ASTNode *b);
+static void gen_stmt(GeneratorContext *ctx, ASTNode *s);
+static void gen_if_value(GeneratorContext *ctx, ASTNode *n);
 
 /**
  * @brief Vygeneruje volání vestavěné funkce
@@ -558,6 +604,10 @@ static void gen_expr(GeneratorContext *ctx, ASTNode *e) {
     gen_binop(ctx, e);
     break;
 
+  case AST_IF:
+    gen_if_value(ctx, e);
+    break;
+
   case AST_UNARY_OP:
     if (e->data.unary_op.operator_type == T_MINUS_SIGN) {
       if (e->expr_type == EXPR_TYPE_DOUBLE) {
@@ -700,6 +750,68 @@ static void gen_block(GeneratorContext *ctx, ASTNode *b) {
 }
 
 /**
+ * @brief Vygeneruje blok větve if jako výrazu; hodnota zůstane na zásobníku
+ *
+ * Všechny příkazy kromě posledního proběhnou normálně. Poslední výraz (nebo
+ * vnořený if s hodnotou) se převede na typ celého if. Končí-li větev
+ * definicí, přiřazením nebo cyklem, je výsledkem nil (Unit). Větev
+ * zakončená return nic nevkládá, protože se z funkce vrací.
+ *
+ * @param ctx: kontext generátoru
+ * @param b: uzel AST_BLOCK větve, může být NULL
+ * @param type: typ výsledku if (ExprType)
+ */
+static void gen_value_block(GeneratorContext *ctx, ASTNode *b, int type) {
+  size_t mark = ctx->vars_n;
+  int has_value = 0;
+
+  if (b) {
+    for (ASTNode *s = b->data.block.statements; s && !ctx->failed;
+         s = s->next) {
+      if (s->next) {
+        gen_stmt(ctx, s);
+      } else if (is_expr(s)) {
+        gen_expr(ctx, s);
+        convert(ctx, s->expr_type, type);
+        has_value = 1;
+      } else if (s->type == AST_IF && s->expr_type != EXPR_TYPE_UNKNOWN) {
+        gen_if_value(ctx, s);
+        convert(ctx, s->expr_type, type);
+        has_value = 1;
+      } else {
+        gen_stmt(ctx, s);
+        has_value = (s->type == AST_RETURN);
+        if (!has_value) {
+          emit(ctx, "PUSHS nil@nil\n");
+          has_value = 1;
+        }
+      }
+    }
+  }
+  if (!has_value && !ctx->failed) {
+    emit(ctx, "PUSHS nil@nil\n");
+  }
+
+  ctx->vars_n = mark;
+}
+
+/**
+ * @brief Vygeneruje if jako výraz; hodnota provedené větve zůstane na zásobníku
+ *
+ * @param ctx: kontext generátoru
+ * @param n: uzel AST_IF s nastaveným expr_type
+ */
+static void gen_if_value(GeneratorContext *ctx, ASTNode *n) {
+  int id = ctx->label_cnt++;
+  gen_expr(ctx, n->data.if_stmt.condition);
+  emit(ctx, "PUSHS bool@false\nJUMPIFEQS $else_%d\n", id);
+  gen_value_block(ctx, n->data.if_stmt.body, n->expr_type);
+  emit(ctx, "JUMP $endif_%d\nLABEL $else_%d\n", id, id);
+  gen_value_block(ctx, n->data.if_stmt.else_body, n->expr_type);
+  emit(ctx, "LABEL $endif_%d\n", id);
+}
+
+/**
  * @brief Vygeneruje definici funkce
  *
  * Vytvoří rámec, zaregistruje parametry, deklaruje lokální proměnné
@@ -731,6 +843,14 @@ static void gen_function(GeneratorContext *ctx, ASTNode *fn) {
        s = s->next) {
     if (!s->next && is_expr(s)) {
       gen_return_value(ctx, s);
+      returned = 1;
+    } else if (!s->next && s->type == AST_IF &&
+               s->expr_type != EXPR_TYPE_UNKNOWN &&
+               s->expr_type != EXPR_TYPE_UNIT &&
+               fn->expr_type != EXPR_TYPE_UNIT) {
+      gen_if_value(ctx, s);
+      convert(ctx, s->expr_type, fn->expr_type);
+      emit(ctx, "POPS GF@_ret\n");
       returned = 1;
     } else {
       gen_stmt(ctx, s);

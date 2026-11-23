@@ -58,9 +58,10 @@ typedef enum TokenType {
   T_KW_BOOLEAN, // Boolean
   T_KW_TRUE,
   T_KW_FALSE,
-  T_AND, // &&
-  T_OR,  // ||
-  T_NOT, // !
+  T_AND,    // &&
+  T_OR,     // ||
+  T_NOT,    // !
+  T_KW_FOR, // for
 } TokenType;
 
 typedef enum State {

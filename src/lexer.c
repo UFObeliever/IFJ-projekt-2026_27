@@ -190,6 +190,7 @@ Token keyword_check(const LexerCtx *ctx) {
   KEYWORD_CHECK(T_KW_BOOLEAN, "Boolean");
   KEYWORD_CHECK(T_KW_TRUE, "true");
   KEYWORD_CHECK(T_KW_FALSE, "false");
+  KEYWORD_CHECK(T_KW_FOR, "for");
   KEYWORD_CHECK(T_KW_IFJ26, "ifj26");
 
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
@@ -1280,6 +1281,7 @@ static const char *token_to_string_table[] = {
     [T_AND] = "T_AND",
     [T_OR] = "T_OR",
     [T_NOT] = "T_NOT",
+    [T_KW_FOR] = "T_KW_FOR",
 };
 
 const char *token_type_to_string(TokenType token) {
@@ -1345,6 +1347,7 @@ void print_token(const Token *token) {
   case T_AND:
   case T_OR:
   case T_NOT:
+  case T_KW_FOR:
   case T_TAB:
     printf("Token {type = %s}", token_type_str);
     break;

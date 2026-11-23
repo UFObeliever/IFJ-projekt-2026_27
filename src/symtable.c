@@ -289,7 +289,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_param_count = 0;
   entry->f_params = NULL;
   smt_insert_global(smt, "readDouble", entry);
-
   entry = symtable_entry_init();
   entry->function = true;
   entry->declared = true;

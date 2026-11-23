@@ -890,6 +890,26 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       if (uerr != SUCCESS)
         return uerr;
 
+    } else if (lookahead.token_type == T_KW_IF && expect_operand) {
+      DEBUG_LOG("[DEBUG] branch: IF EXPRESSION\n");
+      ASTNode *leaf = NULL;
+      int t_int = EXPR_TYPE_UNKNOWN;
+      int perr = parse_if_expression(parser, &leaf, &t_int);
+      if (perr != SUCCESS)
+        return (Error)perr;
+      ExprType t = (ExprType)t_int;
+      if (leaf)
+        leaf->expr_type = t;
+      if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf))
+        return COMPILER_ERR;
+      expect_operand = false;
+      Error merr = apply_member(parser, &tstack, &ast_stack);
+      if (merr != SUCCESS)
+        return merr;
+      Error uerr = reduce_unary(&parser->stack, &tstack, &ast_stack);
+      if (uerr != SUCCESS)
+        return uerr;
+
     } else if (is_open_BRACKET(lookahead.token_type) && expect_operand) {
       DEBUG_LOG("[DEBUG] branch: OPEN BRACKET (\n");
       stack_push(&parser->stack, lookahead.token_type);
