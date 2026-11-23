@@ -187,6 +187,9 @@ Token keyword_check(const LexerCtx *ctx) {
   KEYWORD_CHECK(T_KW_VAR, "var");
   KEYWORD_CHECK(T_KW_WHILE, "while");
   KEYWORD_CHECK(T_EXTENSION, "extension");
+  KEYWORD_CHECK(T_KW_BOOLEAN, "Boolean");
+  KEYWORD_CHECK(T_KW_TRUE, "true");
+  KEYWORD_CHECK(T_KW_FALSE, "false");
   KEYWORD_CHECK(T_KW_IFJ26, "ifj26");
 
   return MAKE_TOKEN_LEXEME(T_IDENTIFICATOR, &ctx->Buffer);
@@ -760,8 +763,32 @@ Token lex_not_equal(LexerCtx *ctx) {
   if (c == '=') {
     return MAKE_TOKEN(T_NOT_EQUAL);
   } else {
-    return MAKE_TOKEN_ERROR();
+    ungetc(c, ctx->input);
+    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+    return MAKE_TOKEN(T_NOT);
   }
+}
+
+static Token lex_and(LexerCtx *ctx) {
+  int c = fgetc(ctx->input);
+  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+  if (c == '&') {
+    return MAKE_TOKEN(T_AND);
+  }
+  ungetc(c, ctx->input);
+  DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+  return MAKE_TOKEN_ERROR();
+}
+
+static Token lex_or(LexerCtx *ctx) {
+  int c = fgetc(ctx->input);
+  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
+  if (c == '|') {
+    return MAKE_TOKEN(T_OR);
+  }
+  ungetc(c, ctx->input);
+  DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
+  return MAKE_TOKEN_ERROR();
 }
 
 Token lex_main_func(LexerCtx *ctx) {
@@ -1128,6 +1155,12 @@ static Token lex_token(LexerCtx *ctx) {
   if (c == '!') {
     return lex_not_equal(ctx);
   }
+  if (c == '&') {
+    return lex_and(ctx);
+  }
+  if (c == '|') {
+    return lex_or(ctx);
+  }
   if (c == '.') {
     int c2 = fgetc(ctx->input);
     ungetc(c2, ctx->input);
@@ -1241,6 +1274,12 @@ static const char *token_to_string_table[] = {
     [T_KW_IFJ26] = "T_KW_IFJ26",
     [T_TAB] = "T_TAB",
     [T_EXTENSION] = "T_EXTENSION",
+    [T_KW_BOOLEAN] = "T_KW_BOOLEAN",
+    [T_KW_TRUE] = "T_KW_TRUE",
+    [T_KW_FALSE] = "T_KW_FALSE",
+    [T_AND] = "T_AND",
+    [T_OR] = "T_OR",
+    [T_NOT] = "T_NOT",
 };
 
 const char *token_type_to_string(TokenType token) {
@@ -1300,6 +1339,12 @@ void print_token(const Token *token) {
   case T_DOT:
   case T_KW_IFJ26:
   case T_EXTENSION:
+  case T_KW_BOOLEAN:
+  case T_KW_TRUE:
+  case T_KW_FALSE:
+  case T_AND:
+  case T_OR:
+  case T_NOT:
   case T_TAB:
     printf("Token {type = %s}", token_type_str);
     break;

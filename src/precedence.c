@@ -8,6 +8,7 @@
 #define PREC_STACK_MAX                                                         \
   ((int)(sizeof(((PrecedenceStack *)0)->items) / sizeof(TokenType)))
 #define T_UNARY_MINUS_MARK ((TokenType)1000)
+#define T_UNARY_NOT_MARK ((TokenType)1001)
 #define CONSUME_TOKEN_GUARD(parser)                                            \
   do {                                                                         \
     Token tok = consume_token((parser));                                       \
@@ -101,6 +102,9 @@ static ExprType expr_type_from_token(TokenType t) {
     return EXPR_TYPE_DOUBLE;
   case T_STRING_LITERAL:
     return EXPR_TYPE_STRING;
+  case T_KW_TRUE:
+  case T_KW_FALSE:
+    return EXPR_TYPE_BOOL;
   default:
     return EXPR_TYPE_UNKNOWN;
   }
@@ -125,74 +129,95 @@ static ExprType expr_type_from_kw(TokenType t) {
 
 static const PrecedenceAction precedence_table[EX_COUNT][EX_COUNT] = {
     /* STACK            +        -           *              /        == != < <=
-       >           >=          is          (               )        , $ operand
-     */
+       >           >=          is          &&          ||          ( )        ,
+       $ operand */
     /* + */ {PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE,
              PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-             PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-             PREC_REDUCE},
+             PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
+             PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
     /* - */
     {PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_REDUCE},
     /* * */
     {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
     /* / */
     {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
     /* == */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_ERROR, PREC_ERROR,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* != */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_ERROR, PREC_ERROR,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* < */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* <= */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* > */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* >= */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* is */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_SHIFT,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
+     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
+    /* && */
+    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
+     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
+    /* || */
+    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
+     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
+     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
+     PREC_REDUCE},
     /* ( */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
      PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_EQUAL, PREC_SHIFT, PREC_ERROR, PREC_SHIFT},
+     PREC_SHIFT, PREC_SHIFT, PREC_EQUAL, PREC_SHIFT, PREC_ERROR, PREC_SHIFT},
     /* ) */
     {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_ERROR},
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE,
+     PREC_REDUCE, PREC_ERROR, PREC_ERROR},
     /* ,  */
     {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
      PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_ERROR, PREC_EQUAL, PREC_ERROR, PREC_SHIFT},
+     PREC_SHIFT, PREC_SHIFT, PREC_EQUAL, PREC_SHIFT, PREC_ERROR, PREC_SHIFT},
     /* $ */
     {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR, PREC_ERROR, PREC_ERROR},
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR,
+     PREC_ERROR, PREC_ERROR},
     /* op */
     {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
      PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR, PREC_ERROR, PREC_ERROR}};
+     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR,
+     PREC_ERROR, PREC_ERROR}};
 
 static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
                                       ExprType *type) {
@@ -240,6 +265,10 @@ ExprColumn token_to_column(TokenType t) {
     return EX_GT;
   case T_GTE:
     return EX_GTE;
+  case T_AND:
+    return EX_AND;
+  case T_OR:
+    return EX_OR;
   case T_OPEN_BRACKET:
     return EX_LPAREN;
   case T_CLOSE_BRACKET:
@@ -250,6 +279,8 @@ ExprColumn token_to_column(TokenType t) {
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
   case T_STRING_LITERAL:
+  case T_KW_TRUE:
+  case T_KW_FALSE:
     return EX_OPERAND;
   default:
     return EX_COUNT;
@@ -273,6 +304,8 @@ static bool is_operand_token(TokenType t) {
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
   case T_STRING_LITERAL:
+  case T_KW_TRUE:
+  case T_KW_FALSE:
     return true;
   default:
     return false;
@@ -299,6 +332,8 @@ static bool is_operator_token(TokenType t) {
   case T_LTE:
   case T_GT:
   case T_GTE:
+  case T_AND:
+  case T_OR:
     return true;
   default:
     return false;
@@ -311,8 +346,31 @@ static bool is_numeric(ExprType t) {
 
 static ExprType int_or_double(ExprType l, ExprType r);
 
+static Error reduce_not(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
+  ExprType t = EXPR_TYPE_UNKNOWN;
+  ASTNode *n = NULL;
+  st->top--;
+  if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &n))
+    return SYN_ANAL_ERR;
+  if (t != EXPR_TYPE_UNKNOWN && t != EXPR_TYPE_BOOL)
+    return STATIC_SEM_TYPE_ERR;
+  ASTNode *u = ast_make_unary(T_NOT, n);
+  if (u)
+    u->expr_type = EXPR_TYPE_BOOL;
+  if (!tstack_push(ts, EXPR_TYPE_BOOL) || !ast_stack_push(as, u))
+    return COMPILER_ERR;
+  return SUCCESS;
+}
+
 static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
-  while (st->top >= 0 && st->items[st->top] == T_UNARY_MINUS_MARK) {
+  while (st->top >= 0 && (st->items[st->top] == T_UNARY_MINUS_MARK ||
+                          st->items[st->top] == T_UNARY_NOT_MARK)) {
+    if (st->items[st->top] == T_UNARY_NOT_MARK) {
+      Error e = reduce_not(st, ts, as);
+      if (e != SUCCESS)
+        return e;
+      continue;
+    }
     ExprType t = EXPR_TYPE_UNKNOWN;
     ASTNode *n = NULL;
     st->top--;
@@ -413,6 +471,14 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
         return STATIC_SEM_TYPE_ERR;
       }
     }
+    result = EXPR_TYPE_BOOL;
+    break;
+  case T_AND:
+  case T_OR:
+    if (left_type != EXPR_TYPE_UNKNOWN && left_type != EXPR_TYPE_BOOL)
+      return STATIC_SEM_TYPE_ERR;
+    if (right_type != EXPR_TYPE_UNKNOWN && right_type != EXPR_TYPE_BOOL)
+      return STATIC_SEM_TYPE_ERR;
     result = EXPR_TYPE_BOOL;
     break;
   default:
@@ -616,6 +682,9 @@ static char *ext_method_key(ExprType t, const char *m) {
   case EXPR_TYPE_UNIT:
     tn = "Unit";
     break;
+  case EXPR_TYPE_BOOL:
+    tn = "Boolean";
+    break;
   default:
     return NULL;
   }
@@ -665,8 +734,6 @@ static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
     if (!strcmp(m, "toString")) {
       fn = "toStr";
       res = EXPR_TYPE_STRING;
-      if (t == EXPR_TYPE_BOOL)
-        return STATIC_SEM_TYPE_ERR;
     } else if (!strcmp(m, "toInt")) {
       fn = "toInt";
       res = EXPR_TYPE_INT;
@@ -801,6 +868,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         free(c);
       } else if (lookahead.token_type == T_STRING_LITERAL) {
         leaf = ast_make_string(strdup((char *)lookahead.token_lexeme.lexeme));
+      } else if (lookahead.token_type == T_KW_TRUE ||
+                 lookahead.token_type == T_KW_FALSE) {
+        leaf = ast_make_bool(lookahead.token_type == T_KW_TRUE);
       } else {
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
@@ -829,6 +899,11 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
     } else if (lookahead.token_type == T_MINUS_SIGN && expect_operand) {
       DEBUG_LOG("[DEBUG] branch: UNARY MINUS\n");
       stack_push(&parser->stack, T_UNARY_MINUS_MARK);
+      CONSUME_TOKEN_GUARD(parser);
+
+    } else if (lookahead.token_type == T_NOT && expect_operand) {
+      DEBUG_LOG("[DEBUG] branch: UNARY NOT\n");
+      stack_push(&parser->stack, T_UNARY_NOT_MARK);
       CONSUME_TOKEN_GUARD(parser);
 
     } else if (is_close_BRACKET(lookahead.token_type)) {

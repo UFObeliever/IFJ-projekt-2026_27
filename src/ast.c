@@ -67,6 +67,13 @@ ASTNode *ast_make_double(double value) {
   return node;
 }
 
+ASTNode *ast_make_bool(bool value) {
+  ASTNode *node = ast_create_node(AST_LITERAL_BOOL);
+  if (node)
+    node->data.int_val = value ? 1 : 0;
+  return node;
+}
+
 ASTNode *ast_make_string(char *value) {
   ASTNode *node = ast_create_node(AST_LITERAL_STRING);
   if (node)

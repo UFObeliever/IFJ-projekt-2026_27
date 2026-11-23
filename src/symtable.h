@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define T_TYPE_BOOLEAN ((TokenType)1001)
+#define T_TYPE_BOOLEAN T_KW_BOOLEAN
 
 typedef struct f_param {
   TokenType type;

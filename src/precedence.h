@@ -37,6 +37,8 @@ typedef enum ExprColumn {
   EX_GT,
   EX_GTE,
   EX_IS,
+  EX_AND,
+  EX_OR,
   EX_LPAREN,
   EX_RPAREN,
   EX_COMMA,

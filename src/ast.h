@@ -20,7 +20,8 @@ typedef enum {
   AST_LITERAL_FLOAT,
   AST_LITERAL_STRING,
   AST_LITERAL_NULL,
-  AST_LITERAL_UNIT
+  AST_LITERAL_UNIT,
+  AST_LITERAL_BOOL
 } ASTNodeType;
 
 typedef struct ASTNode {
@@ -94,6 +95,7 @@ void ast_free(ASTNode *node);
 ASTNode *ast_make_int(int value);
 ASTNode *ast_make_double(double value);
 ASTNode *ast_make_string(char *value);
+ASTNode *ast_make_bool(bool value);
 ASTNode *ast_make_binop(int operator_type, ASTNode *left, ASTNode *right);
 ASTNode *ast_make_if(ASTNode *condition, ASTNode *body, ASTNode *else_body);
 ASTNode *ast_make_while(ASTNode *condition, ASTNode *body);

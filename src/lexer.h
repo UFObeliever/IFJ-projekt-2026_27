@@ -55,6 +55,12 @@ typedef enum TokenType {
   T_KW_IFJ26,
   T_TAB,
   T_EXTENSION,
+  T_KW_BOOLEAN, // Boolean
+  T_KW_TRUE,
+  T_KW_FALSE,
+  T_AND, // &&
+  T_OR,  // ||
+  T_NOT, // !
 } TokenType;
 
 typedef enum State {

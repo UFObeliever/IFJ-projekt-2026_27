@@ -290,6 +290,15 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = NULL;
   smt_insert_global(smt, "readDouble", entry);
 
+  entry = symtable_entry_init();
+  entry->function = true;
+  entry->declared = true;
+  entry->defined = true;
+  entry->type = T_TYPE_BOOLEAN;
+  entry->f_param_count = 0;
+  entry->f_params = NULL;
+  smt_insert_global(smt, "readBoolean", entry);
+
   // toStr
   entry = symtable_entry_init();
   func_params = malloc(sizeof(f_param));

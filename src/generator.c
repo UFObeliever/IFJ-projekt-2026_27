@@ -298,6 +298,7 @@ static int is_expr(ASTNode *s) {
   case AST_LITERAL_STRING:
   case AST_LITERAL_UNIT:
   case AST_LITERAL_NULL:
+  case AST_LITERAL_BOOL:
     return 1;
   default:
     return 0;
@@ -338,8 +339,17 @@ static void gen_builtin(GeneratorContext *ctx, ASTNode *c) {
     emit(ctx, "CALL $$readint\n");
   } else if (!strcmp(name, "readDouble")) {
     emit(ctx, "CALL $$readdouble\n");
+  } else if (!strcmp(name, "readBoolean")) {
+    emit(ctx, "CALL $$readbool\n");
   } else if (!strcmp(name, "toStr")) {
-    if (args->expr_type == EXPR_TYPE_INT) {
+    if (args->expr_type == EXPR_TYPE_BOOL) {
+      int id = ctx->label_cnt++;
+      emit(ctx,
+           "POPS GF@_t1\nJUMPIFEQ $b2s_true_%d GF@_t1 bool@true\n"
+           "PUSHS string@false\nJUMP $b2s_end_%d\nLABEL $b2s_true_%d\n"
+           "PUSHS string@true\nLABEL $b2s_end_%d\n",
+           id, id, id, id);
+    } else if (args->expr_type == EXPR_TYPE_INT) {
       emit(ctx, "INT2STRS\n");
     } else if (args->expr_type == EXPR_TYPE_DOUBLE) {
       emit(ctx, "FLOAT2STRS\n");
@@ -404,6 +414,26 @@ static void gen_call(GeneratorContext *ctx, ASTNode *c) {
 }
 
 /**
+ * @brief Vygeneruje && a || se zkráceným vyhodnocením zleva doprava
+ *
+ * Levý operand se vyhodnotí vždy; pravý jen když výsledek ještě není známý.
+ *
+ * @param ctx: kontext generátoru
+ * @param e: uzel AST_BIN_OP s operátorem T_AND nebo T_OR
+ */
+static void gen_logic(GeneratorContext *ctx, ASTNode *e) {
+  int id = ctx->label_cnt++;
+  const char *skip = e->data.bin_op.operator_type == T_AND ? "false" : "true";
+
+  gen_expr(ctx, e->data.bin_op.left);
+  emit(ctx, "POPS GF@_t1\nJUMPIFEQ $sc_short_%d GF@_t1 bool@%s\n", id, skip);
+  gen_expr(ctx, e->data.bin_op.right);
+  emit(ctx,
+       "JUMP $sc_end_%d\nLABEL $sc_short_%d\nPUSHS bool@%s\nLABEL $sc_end_%d\n",
+       id, id, skip, id);
+}
+
+/**
  * @brief Vygeneruje binární operátor
  *
  * Vyhodnotí operandy, případně převede Int na Double a vypíše operaci.
@@ -417,6 +447,11 @@ static void gen_binop(GeneratorContext *ctx, ASTNode *e) {
   ASTNode *left = e->data.bin_op.left;
   ASTNode *right = e->data.bin_op.right;
   int op = e->data.bin_op.operator_type;
+
+  if (op == T_AND || op == T_OR) {
+    gen_logic(ctx, e);
+    return;
+  }
 
   gen_expr(ctx, left);
   if (left->expr_type == EXPR_TYPE_INT &&
@@ -507,6 +542,10 @@ static void gen_expr(GeneratorContext *ctx, ASTNode *e) {
     emit(ctx, "PUSHS nil@nil\n");
     break;
 
+  case AST_LITERAL_BOOL:
+    emit(ctx, "PUSHS bool@%s\n", e->data.int_val ? "true" : "false");
+    break;
+
   case AST_IDENTIFIER:
     emit(ctx, "PUSHS LF@$v%d\n", lookup(ctx, e->data.string_val));
     break;
@@ -528,6 +567,9 @@ static void gen_expr(GeneratorContext *ctx, ASTNode *e) {
       }
       gen_expr(ctx, e->data.unary_op.operand);
       emit(ctx, "SUBS\n");
+    } else if (e->data.unary_op.operator_type == T_NOT) {
+      gen_expr(ctx, e->data.unary_op.operand);
+      emit(ctx, "NOTS\n");
     } else {
       gen_expr(ctx, e->data.unary_op.operand);
     }
@@ -759,6 +801,12 @@ static const char *HELPERS =
     "JUMPIFEQ $$readdouble_ok GF@_t2 string@float\n"
     "MOVE GF@_t1 float@0x0p+0\n"
     "LABEL $$readdouble_ok\nPUSHS GF@_t1\nRETURN\n\n"
+    "LABEL $$readbool\n"
+    "READ GF@_t1 bool\n"
+    "TYPE GF@_t2 GF@_t1\n"
+    "JUMPIFEQ $$readbool_ok GF@_t2 string@bool\n"
+    "MOVE GF@_t1 bool@false\n"
+    "LABEL $$readbool_ok\nPUSHS GF@_t1\nRETURN\n\n"
     "LABEL $$floor\n"
     "POPS GF@_t1\n"
     "FLOAT2INT GF@_t2 GF@_t1\n"

@@ -285,14 +285,8 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
   case T_KW_DOUBLE:
   case T_KW_STRING:
   case T_KW_UNIT:
+  case T_KW_BOOLEAN:
     *out = ctx->current_token.token_type;
-    advance(ctx);
-    TOKEN_CHEK(ctx->current_token)
-    return 0;
-  case T_IDENTIFICATOR:
-    if (strcmp(ctx->current_token.token_lexeme.lexeme, "Boolean") != 0)
-      return ERR_SYNTAX;
-    *out = T_TYPE_BOOLEAN;
     advance(ctx);
     TOKEN_CHEK(ctx->current_token)
     return 0;
@@ -593,6 +587,8 @@ static const char *ext_type_name(TokenType t) {
     return "String";
   case T_KW_UNIT:
     return "Unit";
+  case T_KW_BOOLEAN:
+    return "Boolean";
   default:
     return NULL;
   }
@@ -897,6 +893,9 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
   case T_STRING_LITERAL:
+  case T_KW_TRUE:
+  case T_KW_FALSE:
+  case T_NOT:
   case T_OPEN_BRACKET:
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   default:
