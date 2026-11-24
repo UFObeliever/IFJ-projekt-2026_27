@@ -65,7 +65,7 @@ typedef struct symtable {
 symtable_entry *symtable_entry_init(void);
 void symtable_entry_dispose(symtable_entry *entry);
 
-int maxInt(int a, int b);
+int max_int(int a, int b);
 int avl_height(avl_tree *tree);
 int node_balance(avl_tree *tree);
 

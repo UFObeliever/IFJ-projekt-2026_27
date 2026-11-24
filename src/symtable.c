@@ -30,7 +30,7 @@ void symtable_entry_dispose(symtable_entry *entry) {
   }
 }
 
-int maxInt(int a, int b) { return (a > b) ? a : b; }
+int max_int(int a, int b) { return (a > b) ? a : b; }
 
 int avl_height(avl_tree *tree) {
   if (tree == NULL) {
@@ -88,7 +88,7 @@ void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data) {
     avl_insert(&(*tree)->right, key, data);
   }
   (*tree)->height =
-      1 + maxInt(avl_height((*tree)->left), avl_height((*tree)->right));
+      1 + max_int(avl_height((*tree)->left), avl_height((*tree)->right));
   *tree = balance(*tree);
 }
 
@@ -108,8 +108,8 @@ avl_tree *rotate_right(avl_tree *tree) {
   avl_tree *tmp = tree->left;
   tree->left = tmp->right;
   tmp->right = tree;
-  tree->height = 1 + maxInt(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + maxInt(avl_height(tmp->left), avl_height(tmp->right));
+  tree->height = 1 + max_int(avl_height(tree->left), avl_height(tree->right));
+  tmp->height = 1 + max_int(avl_height(tmp->left), avl_height(tmp->right));
   return tmp;
 }
 
@@ -117,8 +117,8 @@ avl_tree *rotate_left(avl_tree *tree) {
   avl_tree *tmp = tree->right;
   tree->right = tmp->left;
   tmp->left = tree;
-  tree->height = 1 + maxInt(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + maxInt(avl_height(tmp->left), avl_height(tmp->right));
+  tree->height = 1 + max_int(avl_height(tree->left), avl_height(tree->right));
+  tmp->height = 1 + max_int(avl_height(tmp->left), avl_height(tmp->right));
   return tmp;
 }
 
