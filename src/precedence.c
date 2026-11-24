@@ -127,97 +127,37 @@ static ExprType expr_type_from_kw(TokenType t) {
   }
 }
 
+#define S PREC_SHIFT
+#define R PREC_REDUCE
+#define Q PREC_EQUAL
+#define X PREC_ERROR
+
+// clang-format off
 static const PrecedenceAction precedence_table[EX_COUNT][EX_COUNT] = {
-    /* STACK            +        -           *              /        == != < <=
-       >           >=          is          &&          ||          ( )        ,
-       $ operand */
-    /* + */ {PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE,
-             PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-             PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
-             PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
-    /* - */
-    {PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE},
-    /* * */
-    {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
-    /* / */
-    {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_SHIFT, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE},
-    /* == */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_ERROR, PREC_ERROR,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* != */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_ERROR, PREC_ERROR,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* < */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* <= */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* > */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* >= */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_ERROR, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* is */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* && */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_REDUCE,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* || */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_REDUCE, PREC_SHIFT, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE},
-    /* ( */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_EQUAL, PREC_SHIFT, PREC_ERROR, PREC_SHIFT},
-    /* ) */
-    {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE,
-     PREC_REDUCE, PREC_ERROR, PREC_ERROR},
-    /* ,  */
-    {PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT, PREC_SHIFT,
-     PREC_SHIFT, PREC_SHIFT, PREC_EQUAL, PREC_SHIFT, PREC_ERROR, PREC_SHIFT},
-    /* $ */
-    {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR,
-     PREC_ERROR, PREC_ERROR},
-    /* op */
-    {PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_REDUCE,
-     PREC_REDUCE, PREC_REDUCE, PREC_REDUCE, PREC_ERROR, PREC_REDUCE, PREC_ERROR,
-     PREC_ERROR, PREC_ERROR}};
+    /*          +  -  *  /  == != <  <= >  >= && || (  )  i  $ */
+    /* +  */  {R, R, S, S, R, R, R, R, R, R, R, R, S, R, S, R},
+    /* -  */  {R, R, S, S, R, R, R, R, R, R, R, R, S, R, S, R},
+    /* *  */  {R, R, R, R, R, R, R, R, R, R, R, R, S, R, S, R},
+    /* /  */  {R, R, R, R, R, R, R, R, R, R, R, R, S, R, S, R},
+    /* == */  {S, S, S, S, X, X, S, S, S, S, R, R, S, R, S, R},
+    /* != */  {S, S, S, S, X, X, S, S, S, S, R, R, S, R, S, R},
+    /* <  */  {S, S, S, S, R, R, X, X, X, X, R, R, S, R, S, R},
+    /* <= */  {S, S, S, S, R, R, X, X, X, X, R, R, S, R, S, R},
+    /* >  */  {S, S, S, S, R, R, X, X, X, X, R, R, S, R, S, R},
+    /* >= */  {S, S, S, S, R, R, X, X, X, X, R, R, S, R, S, R},
+    /* && */  {S, S, S, S, S, S, S, S, S, S, R, R, S, R, S, R},
+    /* || */  {S, S, S, S, S, S, S, S, S, S, S, R, S, R, S, R},
+    /* (  */  {S, S, S, S, S, S, S, S, S, S, S, S, S, Q, S, X},
+    /* )  */  {R, R, R, R, R, R, R, R, R, R, R, R, X, R, X, R},
+    /* i  */  {R, R, R, R, R, R, R, R, R, R, R, R, X, R, X, R},
+    /* $  */  {S, S, S, S, S, S, S, S, S, S, S, S, S, X, S, X},
+};
+// clang-format on
+
+#undef S
+#undef R
+#undef Q
+#undef X
 
 static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
                                       ExprType *type) {
@@ -273,8 +213,6 @@ ExprColumn token_to_column(TokenType t) {
     return EX_LPAREN;
   case T_CLOSE_BRACKET:
     return EX_RPAREN;
-  case T_COMMA:
-    return EX_COMMA;
   case T_IDENTIFICATOR:
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
@@ -282,6 +220,8 @@ ExprColumn token_to_column(TokenType t) {
   case T_KW_TRUE:
   case T_KW_FALSE:
     return EX_OPERAND;
+  case T_EOF:
+    return EX_DOLLAR;
   default:
     return EX_COUNT;
   }
@@ -1001,14 +941,6 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         DEBUG_LOG(
             "[DEBUG] precedence loop: top terminal = %d, next operator = %d\n",
             top, next);
-        if (top == T_EOF) {
-          DEBUG_LOG("[DEBUG] top terminal is T_EOF, shifting operator\n");
-          stack_push(&parser->stack, next);
-          CONSUME_TOKEN_GUARD(parser);
-          expect_operand = true;
-          break;
-        }
-
         ExprColumn left = token_to_column(top);
         ExprColumn right = token_to_column(next);
 

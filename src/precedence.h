@@ -36,14 +36,12 @@ typedef enum ExprColumn {
   EX_LTE,
   EX_GT,
   EX_GTE,
-  EX_IS,
   EX_AND,
   EX_OR,
   EX_LPAREN,
   EX_RPAREN,
-  EX_COMMA,
-  EX_DOLLAR,
   EX_OPERAND,
+  EX_DOLLAR,
   EX_COUNT
 } ExprColumn;
 
