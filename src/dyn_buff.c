@@ -1,9 +1,24 @@
+/**
+ * @file dyn_buff.c
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Implementace dynamického bufferu pro řetězce.
+ *
+ * Při nedostatku paměti program skončí s kódem 99.
+ *
+ * @author Matěj Okruhlica (xokruhm00)
+ */
+
 #include "dyn_buff.h"
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
+/**
+ * @brief Výchozí kapacita bufferu, je-li při inicializaci zadána nula
+ */
 #define SB_DEFAULT_INITIAL_CAPACITY 16
 
 void sb_init(StringBuff *buf, size_t initial_capacity) {
