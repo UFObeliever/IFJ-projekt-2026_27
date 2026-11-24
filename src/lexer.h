@@ -14,7 +14,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "DynBuff.h"
+#include "dyn_buff.h"
 #include <stdbool.h>
 #include <stdio.h>
 
