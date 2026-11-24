@@ -26,6 +26,7 @@
 - @param out Soubor, do kterého se kód zapíše (stdout).
 - @return SUCCESS, UNDEF_FN_ERR pokud chybí funkce s anotací @main,
 -         COMPILER_ERR při interní chybě generátoru.
- */generate_program(ASTNode *root, FILE *out);
+ */
+int generate_program(ASTNode *root, FILE *out);
 
 #endif
