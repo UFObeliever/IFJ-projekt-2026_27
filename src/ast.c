@@ -1,3 +1,14 @@
+/**
+ * @file ast.c
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Implementace alokace, konstruktorů a uvolňování uzlů AST.
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #include "ast.h"
 #include <stdlib.h>
 

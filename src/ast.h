@@ -1,3 +1,14 @@
+/**
+ * @file ast.h
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Rozhraní abstraktního syntaktického stromu (AST).
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #ifndef AST_H
 #define AST_H
 
@@ -89,16 +100,80 @@ typedef struct ASTNode {
   } data;
 } ASTNode;
 
+/**
+ * @brief Vytvoří nový uzel AST zadaného typu
+ *
+ * @param type: Typ uzlu AST
+ */
 ASTNode *ast_create_node(ASTNodeType type);
+
+/**
+ * @brief Rekurzivně uvolní uzel AST
+ *
+ * @param node: Uvolňovaný uzel
+ */
 void ast_free(ASTNode *node);
 
+/**
+ * @brief Vytvoří uzel celočíselného literálu
+ *
+ * @param value: Hodnota literálu
+ */
 ASTNode *ast_make_int(int value);
+
+/**
+ * @brief Vytvoří uzel desetinného literálu
+ *
+ * @param value: Hodnota literálu
+ */
 ASTNode *ast_make_double(double value);
+
+/**
+ * @brief Vytvoří uzel řetězcového literálu
+ *
+ * @param value: Řetězec literálu
+ */
 ASTNode *ast_make_string(char *value);
+
+/**
+ * @brief Vytvoří uzel booleovského literálu
+ *
+ * @param value: Pravdivostní hodnota
+ */
 ASTNode *ast_make_bool(bool value);
+
+/**
+ * @brief Vytvoří uzel binární operace
+ *
+ * @param operator_type: Typ operátoru
+ * @param left: Levý operand
+ * @param right: Pravý operand
+ */
 ASTNode *ast_make_binop(int operator_type, ASTNode *left, ASTNode *right);
+
+/**
+ * @brief Vytvoří uzel podmínky if
+ *
+ * @param condition: Podmínka
+ * @param body: Větev then
+ * @param else_body: Větev else
+ */
 ASTNode *ast_make_if(ASTNode *condition, ASTNode *body, ASTNode *else_body);
+
+/**
+ * @brief Vytvoří uzel cyklu while
+ *
+ * @param condition: Podmínka
+ * @param body: Tělo cyklu
+ */
 ASTNode *ast_make_while(ASTNode *condition, ASTNode *body);
+
+/**
+ * @brief Vytvoří uzel unární operace
+ *
+ * @param operator_type: Typ operátoru
+ * @param operand: Operand
+ */
 ASTNode *ast_make_unary(int operator_type, ASTNode *operand);
 
 #endif
