@@ -43,13 +43,13 @@ const char *sb_copy(const StringBuff *buf) {
   if (buf == NULL) {
     return NULL;
   };
-  char *Copye = (char *)malloc(buf->length + 1);
-  if (Copye == NULL) {
+  char *copy = (char *)malloc(buf->length + 1);
+  if (copy == NULL) {
     exit(99);
   };
-  memcpy(Copye, buf->data, buf->length);
-  Copye[buf->length] = '\0';
-  return (const char *)Copye;
+  memcpy(copy, buf->data, buf->length);
+  copy[buf->length] = '\0';
+  return (const char *)copy;
 }
 
 void sb_remove_trailing_whitespace(StringBuff *buff) {

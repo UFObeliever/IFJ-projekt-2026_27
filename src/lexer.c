@@ -497,7 +497,7 @@ static Token lex_string(LexerCtx *ctx) {
         current_state = STATE_STRING_ESCAPE;
       } else if (c == '"') {
         current_state = STATE_STRING_CLOSED;
-      } else if (c >= ' ') {
+      } else if (c >= ' ' && c < 127) {
         sb_append_char(&ctx->Buffer, input_char);
         current_state = STATE_STRING_BODY;
       } else {

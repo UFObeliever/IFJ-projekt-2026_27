@@ -7,4 +7,5 @@ def f(a: Int): Int =
     2
 
 @main def main(): Unit =
-  val m = 0
+  print(f(0 - 1))
+  print(f(1))

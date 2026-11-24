@@ -612,8 +612,9 @@ add(c, "blok_konci_cyklem_explicitni_int", 6,
     F("def f(): Int =\n  var a = 1\n  while a < 3 do\n    a = a + 1"))
 add(c, "if_vetev_bez_return_explicitni_int", 6,
     F("def f(a: Int): Int =\n  var b = 0\n  if a < 0 then\n    return 1\n  else\n    b = 2"))
-add(c, "if_vetve_s_hodnotami_explicitni_int", 6,
-    F("def f(a: Int): Int =\n  if a < 0 then\n    1\n  else\n    2"))
+add(c, "ok_if_vetve_s_hodnotami_explicitni_int_control", 0,
+    FB("def f(a: Int): Int =\n  if a < 0 then\n    1\n  else\n    2\n",
+       "print(f(0 - 1))\nprint(f(1))"))
 add(c, "prima_rekurze_bez_typu", 6, F("def f(a: Int) = f(a)"))
 add(c, "prima_rekurze_blok_bez_typu", 6, F("def f(a: Int) =\n  val b = f(a)"))
 add(c, "neprima_rekurze_bez_typu", 6, F("def f(a: Int) = g(a)\ndef g(a: Int) = f(a)"))

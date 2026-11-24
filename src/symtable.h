@@ -91,7 +91,7 @@ void symtable_entry_dispose(symtable_entry *entry);
  * @param a: První číslo
  * @param b: Druhé číslo
  */
-int maxInt(int a, int b);
+int max_int(int a, int b);
 
 /**
  * @brief Vrátí výšku AVL podstromu

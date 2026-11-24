@@ -816,8 +816,8 @@ class Interp:
             cond = self.eval(s[1], env)
             if not isinstance(cond, bool):
                 raise IFJError("podmínka není Boolean")
-            self.run_block(s[2] if cond else s[3], env)
-            return UNIT
+            v = self.run_block(s[2] if cond else s[3], env)
+            return v if s[3] else UNIT
         if k == "while":
             while True:
                 self.steps += 1
