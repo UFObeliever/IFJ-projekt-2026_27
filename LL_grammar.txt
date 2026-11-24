@@ -1,53 +1,88 @@
-Program -> 
-    Prolog FunctionList EOF
+LL gramatika jazyka IFJ26 (včetně rozšíření)
+============================================
 
-Prolog -> 
-    "import" "ifj26" "." "*"
+Terminály jsou tokeny lexikálního analyzátoru. INDENT a DEDENT označují
+začátek a konec odsazeného bloku; DEDENT stojí hned za posledním příkazem
+bloku, EOL ukončující jeho poslední řádek už patří nadřazené konstrukci.
+'výraz' je výraz zpracovaný precedenční analýzou (viz precedenční tabulka),
+FIRST(výraz) = { id, literál, true, false, (, -, !, if }.
+'<-' vrací lexer jako dvojici tokenů '<' '-'; 'to', 'until' a 'by' jsou
+identifikátory s daným lexémem.
 
-MainFunction -> 
-    "@main" "def" ID "(" ")" ":" "Unit" "=" FunctionBody
+ 1. <program>     -> <eols> import ifj26 . * EOL <fun_list> EOF
+ 2. <eols>        -> EOL <eols>
+ 3. <eols>        -> ε
+ 4. <fun_list>    -> <fun_def> <fun_list>
+ 5. <fun_list>    -> <extension> <fun_list>
+ 6. <fun_list>    -> EOL <fun_list>
+ 7. <fun_list>    -> ε
+ 8. <fun_def>     -> @main <eols> <def>
+ 9. <fun_def>     -> <def>
+10. <def>         -> def id <param_lists> <ret_type> = <fun_body>
+11. <param_lists> -> ( <params> ) <param_lists>
+12. <param_lists> -> ε
+13. <params>      -> <param> <params_n>
+14. <params>      -> ε
+15. <params_n>    -> , <param> <params_n>
+16. <params_n>    -> ε
+17. <param>       -> id : <type>
+18. <ret_type>    -> : <type>
+19. <ret_type>    -> ε
+20. <type>        -> Int
+21. <type>        -> Double
+22. <type>        -> String
+23. <type>        -> Unit
+24. <type>        -> Boolean
+25. <fun_body>    -> výraz
+26. <fun_body>    -> <block>
+27. <extension>   -> extension ( <param> ) EOL INDENT <def> <ext_defs> DEDENT
+28. <ext_defs>    -> EOL <ext_defs>
+29. <ext_defs>    -> <def> <ext_defs>
+30. <ext_defs>    -> ε
+31. <block>       -> EOL INDENT <stmt> <stmt_list> DEDENT
+32. <stmt_list>   -> EOL <stmt_rest>
+33. <stmt_list>   -> ; <stmt_rest>
+34. <stmt_list>   -> ε
+35. <stmt_rest>   -> <stmt> <stmt_list>
+36. <stmt_rest>   -> EOL <stmt_rest>
+37. <stmt_rest>   -> ε
+38. <stmt>        -> val id <opt_type> = výraz
+39. <stmt>        -> var id <opt_type> = výraz
+40. <stmt>        -> id = výraz
+41. <stmt>        -> výraz
+42. <stmt>        -> return <ret_val>
+43. <stmt>        -> if výraz then <body> <else>
+44. <stmt>        -> while výraz do <body>
+45. <stmt>        -> for <for_head> do <body>
+46. <opt_type>    -> : <type>
+47. <opt_type>    -> ε
+48. <ret_val>     -> výraz
+49. <ret_val>     -> ε
+50. <else>        -> else <body>
+51. <else>        -> EOL else <body>
+52. <else>        -> ε
+53. <body>        -> <block>
+54. <body>        -> <stmt>
+55. <for_head>    -> <generator> <guards>
+56. <for_head>    -> EOL INDENT <generator> <guards_ml> DEDENT EOL
+57. <generator>   -> id <- výraz <range> výraz <step>
+58. <range>       -> to
+59. <range>       -> until
+60. <step>        -> by výraz
+61. <step>        -> ε
+62. <guards>      -> if výraz <guards>
+63. <guards>      -> ε
+64. <guards_ml>   -> EOL if výraz <guards_ml>
+65. <guards_ml>   -> ε
 
-ValDef -> 
-    "val" ID ( ":" Type )? "=" ( Expression | Call )
+# if jako výraz (CONTROL), volá jej precedenční analýza na místě operandu
+66. <if_expr>     -> if výraz then <branch> <else_e>
+67. <else_e>      -> else <branch>
+68. <else_e>      -> EOL else <branch>
+69. <branch>      -> výraz
+70. <branch>      -> <block>
 
-VarDef -> 
-    "var" ID ( ":" Type )? "=" ( Expression | Call )
-
-IfStatement -> 
-    "if" Expression "then" Block "else" Block
-
-WhileStatement -> 
-    "while" Expression "do" Block
-
-Defsingle ->
-    "def" ID"(" Parameters ")" (":" ReturnType )? "=" ( Expression | Call )
-
-DefMulti ->
-    "def" ID"(" Parameters ")" (":" ReturnType )? "=" Block
-
-Parameter ->
-    ID ":" Type
-
-Parameters -> 
-    Parameter ( "," Parameter )* | empty
-
-Block -> 
-    EOL INDENT StatementList DEDENT
-
-StatementList -> 
-    Statement ( ( EOL | ";" ) Statement )*
-
-Type ->
-    Int | Double | String | Unit
-
-Assignment ->
-    ID "=" ( Expression | Call )
-
-Return ->
-    "return" ( Expression | Call )?
-
-FunctionList -> 
-    ( DefSingle | DefMulti | MainFunction )*
-
-Statement -> 
-    ValDef | VarDef | Assignment | IfStatement | WhileStatement | Return | Call | Expression
+Konflikty v LL tabulce a jejich řešení:
+  [<else>, else] pravidla [50, 52]: else patří nejbližšímu if
+  [<else>, EOL] pravidla [51, 52]: pravidlo 51, začíná-li další řádek else zarovnaným s if, jinak 52
+  [<stmt>, id] pravidla [40, 41]: přiřazení, je-li 2. token =, jinak výraz
