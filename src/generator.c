@@ -6,6 +6,7 @@
  * proměnné čísluje podle deklarací a návratové hodnoty předává přes GF@_ret.
  * Vestavěné funkce generuje přímo nebo pomocí pomocných rutin.
  * Výstup zapíše až po úspěšném zpracování celého AST.
+ * @author Klára Vantuchová (xvantuk00)
  */
 
 #include "generator.h"

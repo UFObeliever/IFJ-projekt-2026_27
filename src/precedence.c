@@ -10,6 +10,8 @@
  *
  * @author Alex Oľšavský (xolsava00)
  * @author Jaroslav Vančura (xvancuj00)
+ * @author Matěj Okruhlica (xokruhm00)
+ * @author Klára Vantuchová (xvantuk00)
  */
 
 #include "precedence.h"
