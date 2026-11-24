@@ -1,3 +1,22 @@
+/**
+ * @file parser.c
+ *
+ * Implementace překladače imperativního jazyka IFJ26
+ *
+ * @brief Syntaktická a sémantická analýza rekurzivním sestupem.
+ *
+ * Parser čte tokeny z lexikálního analyzátoru a ukládá je do vyrovnávací
+ * paměti, aby se mohl vracet k dříve přečteným místům. Nejprve projde
+ * hlavičky všech funkcí a rozšiřujících metod a zapíše je do tabulky
+ * symbolů, potom analyzuje jejich těla. Příkazy zpracovává rekurzivním
+ * sestupem podle LL gramatiky, výrazy předává precedenční analýze
+ * (precedence.c). Během analýzy kontroluje typy a vytváří AST, které
+ * předá generátoru. Cyklus for převádí na cyklus while.
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #include "parser.h"
 #include "precedence.h"
 #include <assert.h>
@@ -5,7 +24,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief Návratový kód syntaktické chyby
+ */
 #define ERR_SYNTAX 2
+/**
+ * @brief Ukončí volající funkci s chybou 1, je-li token lexikální chybou
+ *
+ * @param token: kontrolovaný token
+ */
 #define TOKEN_CHEK(token)                                                      \
   do {                                                                         \
     if ((token).token_type == T_ERROR) {                                       \
@@ -68,8 +95,13 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
                            bool as_expr);
 static TokenType kw_from_expr_type(ExprType t);
 static bool types_compatible(TokenType declared, ExprType actual);
-static Token raw_token(ParserCtx *ctx, size_t idx); // added for SCIENCE!!!
+static Token raw_token(ParserCtx *ctx, size_t idx);
 
+/**
+ * @brief Převede typ z klíčového slova na typ výrazu
+ *
+ * @param t: token typu (Int, Double, String, Unit, Boolean)
+ */
 static ExprType expr_from_kw(TokenType t) {
   if (t == T_TYPE_BOOLEAN)
     return EXPR_TYPE_BOOL;
@@ -87,6 +119,13 @@ static ExprType expr_from_kw(TokenType t) {
   }
 }
 
+/**
+ * @brief Připojí uzel (případně celý řetězec uzlů) na konec seznamu
+ *
+ * @param head: začátek seznamu
+ * @param tail: poslední prvek seznamu, po připojení se posune na konec
+ * @param n: připojovaný uzel, NULL se ignoruje
+ */
 static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
   if (!n)
     return;
@@ -99,6 +138,12 @@ static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
   *tail = n;
 }
 
+/**
+ * @brief Vrátí token na daném indexu vyrovnávací paměti
+ *
+ * @param ctx: kontext parseru
+ * @param idx: index tokenu
+ */
 static Token raw_token(ParserCtx *ctx, size_t idx) {
   while (idx >= ctx->tokens_len) {
     if (ctx->tokens_len > 0) {
@@ -124,11 +169,22 @@ static Token raw_token(ParserCtx *ctx, size_t idx) {
   return ctx->tokens[idx];
 }
 
+/**
+ * @brief Uloží aktuální pozici čtení, aby se k ní šlo vrátit
+ *
+ * @param ctx: kontext parseru
+ */
 static SourceMark mark_get(const ParserCtx *ctx) {
   SourceMark m = {ctx->pos, ctx->current_token, ctx->line_indent, ctx->at_bol};
   return m;
 }
 
+/**
+ * @brief Vrátí čtení na dříve uloženou pozici
+ *
+ * @param ctx: kontext parseru
+ * @param m: pozice získaná funkcí mark_get
+ */
 static void mark_set(ParserCtx *ctx, const SourceMark *m) {
   ctx->pos = m->pos;
   ctx->current_token = m->tok;
@@ -136,6 +192,11 @@ static void mark_set(ParserCtx *ctx, const SourceMark *m) {
   ctx->at_bol = m->at_bol;
 }
 
+/**
+ * @brief Přečte další token a aktualizuje odsazení aktuálního řádku
+ *
+ * @param ctx: kontext parseru
+ */
 static Token fetch_token(ParserCtx *ctx) {
   Token t = raw_token(ctx, ctx->pos++);
 
@@ -152,6 +213,11 @@ static Token fetch_token(ParserCtx *ctx) {
   return t;
 }
 
+/**
+ * @brief Posune se na další významný token
+ *
+ * @param ctx: kontext parseru
+ */
 static void advance(ParserCtx *ctx) {
   ctx->current_token = fetch_token(ctx);
   while (ctx->current_token.token_type == T_WHITESPACE_SEP ||
@@ -161,6 +227,11 @@ static void advance(ParserCtx *ctx) {
   }
 }
 
+/**
+ * @brief Posune se na další token, odsazení ale nepřeskakuje
+ *
+ * @param ctx: kontext parseru
+ */
 static void advance_(ParserCtx *ctx) {
   ctx->current_token = fetch_token(ctx);
   while (ctx->current_token.token_type == T_WHITESPACE_SEP) {
@@ -168,6 +239,12 @@ static void advance_(ParserCtx *ctx) {
   }
 }
 
+/**
+ * @brief Ověří typ aktuálního tokenu a posune se za něj
+ *
+ * @param ctx: kontext parseru
+ * @param expected: očekávaný typ tokenu
+ */
 static int match(ParserCtx *ctx, TokenType expected) {
   if (ctx->current_token.token_type == expected) {
     DEBUG_LOG("match: token %d does match expected %d\n",
@@ -233,6 +310,11 @@ int parse_program(ParserCtx *ctx) {
   return match(ctx, T_EOF);
 }
 
+/**
+ * @brief Zpracuje prolog import ifj26.* (pravidlo 1 LL gramatiky)
+ *
+ * @param ctx: kontext parseru
+ */
 static int parse_prolog(ParserCtx *ctx) {
   int status;
   while (ctx->current_token.token_type == T_EOL ||
@@ -255,6 +337,11 @@ static int parse_prolog(ParserCtx *ctx) {
   return match(ctx, T_EOL);
 }
 
+/**
+ * @brief Zpracuje seznam definic funkcí a bloků extension (pravidla 4–7)
+ *
+ * @param ctx: kontext parseru
+ */
 static int parse_function_list(ParserCtx *ctx) {
   while (ctx->current_token.token_type == T_EOL ||
          (ctx->current_token.token_type == T_INDENTS &&
@@ -287,6 +374,12 @@ static int parse_function_list(ParserCtx *ctx) {
   return ERR_SYNTAX;
 }
 
+/**
+ * @brief Zpracuje jméno typu (pravidla 20–24)
+ *
+ * @param ctx: kontext parseru
+ * @param out: načtený typ jako token klíčového slova
+ */
 static int parse_type(ParserCtx *ctx, TokenType *out) {
   switch (ctx->current_token.token_type) {
   case T_KW_INT:
@@ -304,6 +397,13 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
   }
 }
 
+/**
+ * @brief Zpracuje jeden seznam parametrů v závorkách (pravidla 11–17)
+ *
+ * @param ctx: kontext parseru
+ * @param params: pole parametrů funkce, podle potřeby se zvětší
+ * @param count: počet parametrů v poli, zvýší se o načtené parametry
+ */
 static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   int status;
 
@@ -364,12 +464,24 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   return match(ctx, T_CLOSE_BRACKET);
 }
 
+/**
+ * @brief Uvolní pole parametrů včetně jejich jmen
+ *
+ * @param params: pole parametrů
+ * @param count: počet parametrů v poli
+ */
 static void free_params(f_param *params, int count) {
   for (int i = 0; i < count; i++)
     free(params[i].name);
   free(params);
 }
 
+/**
+ * @brief Zpracuje hlavičku funkce až po znak = (pravidla 8–12, 18–19)
+ *
+ * @param ctx: kontext parseru
+ * @param h: načtená hlavička
+ */
 static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
   int status;
   h->name = NULL;
@@ -426,6 +538,13 @@ static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
   return match(ctx, T_ASSIGN);
 }
 
+/**
+ * @brief Vloží funkci do globální tabulky symbolů
+ *
+ * @param ctx: kontext parseru
+ * @param h: hlavička funkce, záznam převezme její parametry
+ * @param def_pos: pozice tokenu def v proudu tokenů
+ */
 static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
                                          size_t def_pos) {
   symtable_entry *en = symtable_entry_init();
@@ -449,13 +568,19 @@ static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
 /**
  * @brief Říká, zda poslední příkaz bloku dává hodnotu
  *
- * Hodnotu dává výraz a také if se shodnými typy větví (CONTROL).
+ * @param s: informace o posledním příkazu bloku
  */
 static bool is_value_stmt(const StmtInfo *s) {
   return s->kind == SK_EXPR ||
          (s->kind == SK_IF && s->type != EXPR_TYPE_UNKNOWN);
 }
 
+/**
+ * @brief Ověří, že za tělem funkce správně začíná další definice
+ *
+ * @param ctx: kontext parseru
+ * @param base_indent: odsazení řádku s def (v bloku extension nenulové)
+ */
 static bool body_ends_here(const ParserCtx *ctx, int base_indent) {
   TokenType t = ctx->current_token.token_type;
   if (t == T_EOF)
@@ -465,6 +590,13 @@ static bool body_ends_here(const ParserCtx *ctx, int base_indent) {
   return (base_indent > 0 && ctx->line_indent == base_indent && t == T_KW_DEF);
 }
 
+/**
+ * @brief Analyzuje tělo funkce a vytvoří její uzel AST
+ *
+ * @param ctx: kontext parseru, aktuální token je za znakem =
+ * @param name: jméno funkce
+ * @param fentry: záznam funkce v tabulce symbolů
+ */
 static int analyze_function(ParserCtx *ctx, const char *name,
                             symtable_entry *fentry) {
   int status = 0;
@@ -583,6 +715,12 @@ int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry) {
   return status;
 }
 
+/**
+ * @brief Přeskočí tělo funkce bez analýzy
+ *
+ * @param ctx: kontext parseru
+ * @param base_indent: odsazení řádku s def
+ */
 static void skip_function_body(ParserCtx *ctx, int base_indent) {
   while (true) {
     TokenType t = ctx->current_token.token_type;
@@ -595,6 +733,11 @@ static void skip_function_body(ParserCtx *ctx, int base_indent) {
   }
 }
 
+/**
+ * @brief Vrátí jméno typu příjemce rozšiřující metody
+ *
+ * @param t: token typu
+ */
 static const char *ext_type_name(TokenType t) {
   switch (t) {
   case T_KW_INT:
@@ -612,7 +755,12 @@ static const char *ext_type_name(TokenType t) {
   }
 }
 
-// extension (jméno: Typ)+konec řádku; další řádek musí být odsazený def
+/**
+ * @brief Zpracuje hlavičku extension (jméno: Typ) (pravidlo 27)
+ *
+ * @param ctx: kontext parseru, aktuální token je extension
+ * @param r: načtený příjemce, jméno je třeba uvolnit
+ */
 static int parse_extension_header(ParserCtx *ctx, ExtRecv *r) {
   int status;
   f_param *ps = NULL;
@@ -651,8 +799,12 @@ static int parse_extension_header(ParserCtx *ctx, ExtRecv *r) {
   return 0;
 }
 
-// metoda je v tabulce symbolů pod jménem "Typ$metoda" a příjemce je její
-// první parametr, takže generátor vidí obyčejnou funkci
+/**
+ * @brief Převede rozšiřující metodu na běžnou funkci
+ *
+ * @param h: hlavička metody, upraví se jméno a parametry
+ * @param r: příjemce z hlavičky extension
+ */
 static int apply_receiver(FuncHeader *h, const ExtRecv *r) {
   for (int i = 0; i < h->param_count; i++) {
     if (strcmp(h->params[i].name, r->name) == 0)
@@ -681,6 +833,11 @@ static int apply_receiver(FuncHeader *h, const ExtRecv *r) {
   return 0;
 }
 
+/**
+ * @brief Při prvním průchodu zaregistruje všechny metody bloku extension
+ *
+ * @param ctx: kontext parseru, aktuální token je extension
+ */
 static int collect_extension(ParserCtx *ctx) {
   ExtRecv r;
   int status = parse_extension_header(ctx, &r);
@@ -714,6 +871,11 @@ static int collect_extension(ParserCtx *ctx) {
   return status;
 }
 
+/**
+ * @brief První průchod: zaregistruje hlavičky všech funkcí a metod
+ *
+ * @param ctx: kontext parseru
+ */
 static int collect_signatures(ParserCtx *ctx) {
   const SourceMark start = mark_get(ctx);
   int result = 0;
@@ -760,6 +922,12 @@ static int collect_signatures(ParserCtx *ctx) {
   return result;
 }
 
+/**
+ * @brief Zpracuje definici funkce nebo metody (pravidla 8–10)
+ *
+ * @param ctx: kontext parseru
+ * @param recv: příjemce u metody bloku extension, jinak NULL
+ */
 static int parse_defsingle(ParserCtx *ctx, const ExtRecv *recv) {
   int status;
   const size_t def_pos = ctx->pos - 1;
@@ -797,6 +965,11 @@ static int parse_defsingle(ParserCtx *ctx, const ExtRecv *recv) {
   return analyze_function(ctx, h.name, fentry);
 }
 
+/**
+ * @brief Zpracuje blok extension s jednou či více metodami (pravidla 27–30)
+ *
+ * @param ctx: kontext parseru, aktuální token je extension
+ */
 static int parse_extension(ParserCtx *ctx) {
   ExtRecv r;
   int status = parse_extension_header(ctx, &r);
@@ -824,6 +997,14 @@ static int parse_extension(ParserCtx *ctx) {
   return status;
 }
 
+/**
+ * @brief Zpracuje posloupnost příkazů bloku (pravidla 31–37)
+ *
+ * @param ctx: kontext parseru
+ * @param current_indent: odsazení příkazů bloku
+ * @param out: informace o posledním příkazu bloku, může být NULL
+ * @param list: seznam uzlů AST příkazů, může být NULL
+ */
 static int parse_statement_list(ParserCtx *ctx, int current_indent,
                                 StmtInfo *out, ASTNode **list) {
   StmtInfo last = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
@@ -865,6 +1046,12 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent,
   return 0;
 }
 
+/**
+ * @brief Zpracuje výraz jako příkaz (pravidlo 41)
+ *
+ * @param ctx: kontext parseru
+ * @param info: informace o příkazu
+ */
 static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
   ExprType t = EXPR_TYPE_UNKNOWN;
   ASTNode *ast = NULL;
@@ -877,6 +1064,12 @@ static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
   return status;
 }
 
+/**
+ * @brief Ověří ukončení jednoduchého příkazu
+ *
+ * @param ctx: kontext parseru
+ * @param status: výsledek analýzy příkazu, chyba se jen předá dál
+ */
 static int end_of_simple_statement(ParserCtx *ctx, int status) {
   if (status != 0)
     return status;
@@ -893,6 +1086,13 @@ static int end_of_simple_statement(ParserCtx *ctx, int status) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje jeden příkaz podle prvního tokenu (pravidla 38–45)
+ *
+ * @param ctx: kontext parseru
+ * @param current_indent: odsazení řádku s příkazem
+ * @param info: informace o příkazu
+ */
 static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   switch (ctx->current_token.token_type) {
   case T_KW_VAL:
@@ -925,6 +1125,11 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   }
 }
 
+/**
+ * @brief Převede typ výrazu na typ jako token klíčového slova
+ *
+ * @param t: typ výrazu
+ */
 static TokenType kw_from_expr_type(ExprType t) {
   switch (t) {
   case EXPR_TYPE_INT:
@@ -942,6 +1147,12 @@ static TokenType kw_from_expr_type(ExprType t) {
   }
 }
 
+/**
+ * @brief Ověří, zda lze hodnotu daného typu uložit do deklarovaného typu
+ *
+ * @param declared: deklarovaný typ
+ * @param actual: typ hodnoty, EXPR_TYPE_UNKNOWN je kompatibilní vždy
+ */
 static bool types_compatible(TokenType declared, ExprType actual) {
   if (actual == EXPR_TYPE_UNKNOWN) {
     return true;
@@ -962,6 +1173,12 @@ static bool types_compatible(TokenType declared, ExprType actual) {
   }
 }
 
+/**
+ * @brief Zpracuje definici nemodifikovatelné proměnné val (pravidlo 38)
+ *
+ * @param ctx: kontext parseru
+ * @param info: informace o příkazu
+ */
 static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_VAL)) != 0)
@@ -1016,6 +1233,12 @@ static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje definici modifikovatelné proměnné var (pravidlo 39)
+ *
+ * @param ctx: kontext parseru
+ * @param info: informace o příkazu
+ */
 static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_VAR)) != 0)
@@ -1069,6 +1292,12 @@ static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje přiřazení id = výraz (pravidlo 40)
+ *
+ * @param ctx: kontext parseru
+ * @param info: informace o příkazu
+ */
 static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
   int status;
 
@@ -1114,6 +1343,12 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje návrat z funkce return (pravidla 42, 48–49)
+ *
+ * @param ctx: kontext parseru
+ * @param info: informace o příkazu
+ */
 static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_RETURN)) != 0)
@@ -1146,6 +1381,13 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje podmínku if nebo while
+ *
+ * @param ctx: kontext parseru
+ * @param terminator: token, kterým podmínka končí (then nebo do)
+ * @param cond: uzel AST podmínky
+ */
 static int parse_condition(ParserCtx *ctx, TokenType terminator,
                            ASTNode **cond) {
   ExprType type = EXPR_TYPE_UNKNOWN;
@@ -1162,8 +1404,9 @@ static int parse_condition(ParserCtx *ctx, TokenType terminator,
 /**
  * @brief Zjistí, zda větev if dává hodnotu, a jakého typu
  *
- * Ve výrazu (as_expr) má větev zakončená definicí, přiřazením nebo cyklem
- * hodnotu () typu Unit. Větev zakončená return hodnotu nedává (nevrací se).
+ * @param b: informace o posledním příkazu větve
+ * @param as_expr: true pro if jako výraz
+ * @param t: typ hodnoty větve
  */
 static bool branch_value(const StmtInfo *b, bool as_expr, ExprType *t) {
   switch (b->kind) {
@@ -1191,7 +1434,11 @@ static bool branch_value(const StmtInfo *b, bool as_expr, ExprType *t) {
 }
 
 /**
- * @brief Sjednotí typy dvou větví; jediná implicitní konverze je Int na Double
+ * @brief Sjednotí typy dvou větví if
+ *
+ * @param a: typ větve then
+ * @param b: typ větve else
+ * @param out: společný typ
  */
 static bool unify_types(ExprType a, ExprType b, ExprType *out) {
   if (a == b || b == EXPR_TYPE_UNKNOWN) {
@@ -1211,10 +1458,13 @@ static bool unify_types(ExprType a, ExprType b, ExprType *out) {
 }
 
 /**
- * @brief Větev if: blok, nebo (ve výrazu) jednořádkový výraz
+ * @brief Zpracuje větev if: blok, nebo jednořádkový příkaz či výraz
  *
- * Jednořádkový výraz ve výrazovém if nekončí příkazem, takže za ním může
- * následovat ')' nebo ',' a nesmí tam být konec řádku.
+ * @param ctx: kontext parseru
+ * @param current_indent: odsazení řádku s if
+ * @param out: informace o posledním příkazu větve
+ * @param blk: uzel AST_BLOCK větve
+ * @param as_expr: true pro if jako výraz
  */
 static int parse_branch(ParserCtx *ctx, int current_indent, StmtInfo *out,
                         ASTNode **blk, bool as_expr) {
@@ -1235,11 +1485,13 @@ static int parse_branch(ParserCtx *ctx, int current_indent, StmtInfo *out,
 }
 
 /**
- * @brief Společná část if jako příkazu a if jako výrazu
+ * @brief Společná část if jako příkazu a if jako výrazu (pravidla 43, 50–52,
+ * 66–70)
  *
- * Má-li if větev else a obě větve dávají hodnotu, má i celý if hodnotu
- * (info->type a expr_type uzlu). Ve výrazu je else povinný a typy větví
- * se musí shodovat (chyba 6).
+ * @param ctx: kontext parseru, aktuální token je if
+ * @param current_indent: odsazení řádku s if
+ * @param info: informace o příkazu
+ * @param as_expr: true pro if jako výraz
  */
 static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
                            bool as_expr) {
@@ -1317,6 +1569,13 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
   return 0;
 }
 
+/**
+ * @brief Zpracuje podmíněný příkaz if
+ *
+ * @param ctx: kontext parseru, aktuální token je if
+ * @param current_indent: odsazení řádku s if
+ * @param info: informace o příkazu
+ */
 static int parse_if_statement(ParserCtx *ctx, int current_indent,
                               StmtInfo *info) {
   return parse_if_common(ctx, current_indent, info, false);
@@ -1325,9 +1584,7 @@ static int parse_if_statement(ParserCtx *ctx, int current_indent,
 /**
  * @brief Po if zakončeném blokem vrátí čtení na konec řádku
  *
- * Blok if spotřebuje konce řádků až k prvnímu tokenu dalšího řádku. Výraz
- * i příkaz, jehož je if částí, ale na konec řádku čekají, proto se token
- * znovu nastaví na první konec řádku před aktuálním tokenem.
+ * @param ctx: kontext parseru
  */
 static void rewind_to_eol(ParserCtx *ctx) {
   if (ctx->tokens_len == 0 || ctx->pos == 0)
@@ -1355,14 +1612,6 @@ static void rewind_to_eol(ParserCtx *ctx) {
   ctx->at_bol = true;
 }
 
-/**
- * @brief if jako výraz; volá ho parser výrazů na místě operandu
- *
- * @param ctx: kontext parseru, aktuální token je if
- * @param out: kořen AST (uzel AST_IF s nastaveným expr_type)
- * @param out_type: typ výsledku (ExprType)
- * @return 0, nebo chybový kód
- */
 int parse_if_expression(ParserCtx *ctx, ASTNode **out, int *out_type) {
   StmtInfo info = {SK_OTHER, EXPR_TYPE_UNKNOWN, false, NULL};
   int status = parse_if_common(ctx, ctx->line_indent, &info, true);
@@ -1374,6 +1623,13 @@ int parse_if_expression(ParserCtx *ctx, ASTNode **out, int *out_type) {
   return 0;
 }
 
+/**
+ * @brief Zpracuje cyklus while (pravidlo 44)
+ *
+ * @param ctx: kontext parseru, aktuální token je while
+ * @param current_indent: odsazení řádku s while
+ * @param info: informace o příkazu
+ */
 static int parse_while_statement(ParserCtx *ctx, int current_indent,
                                  StmtInfo *info) {
   int status;
@@ -1395,6 +1651,14 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent,
   return status;
 }
 
+/**
+ * @brief Zpracuje odsazený blok (pravidlo 31)
+ *
+ * @param ctx: kontext parseru, aktuální token je konec řádku
+ * @param expected_indent: odsazení nadřazeného příkazu
+ * @param out: informace o posledním příkazu bloku, může být NULL
+ * @param blk: vytvořený uzel AST_BLOCK, může být NULL
+ */
 static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out,
                        ASTNode **blk) {
   int status;
@@ -1425,6 +1689,15 @@ static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out,
   return status;
 }
 
+/**
+ * @brief Zpracuje tělo větve nebo cyklu: blok, nebo jeden příkaz (pravidla
+ * 53–54)
+ *
+ * @param ctx: kontext parseru
+ * @param current_indent: odsazení řádku s nadřazeným příkazem
+ * @param out: informace o posledním příkazu těla, může být NULL
+ * @param blk: vytvořený uzel AST_BLOCK
+ */
 static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
                       ASTNode **blk) {
   if (ctx->current_token.token_type == T_EOL)
@@ -1445,11 +1718,22 @@ static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
 
 static int for_counter = 0;
 
+/**
+ * @brief Ověří, zda je aktuální token identifikátor s daným lexémem
+ *
+ * @param ctx: kontext parseru
+ * @param word: hledaný lexém
+ */
 static bool is_word(const ParserCtx *ctx, const char *word) {
   return ctx->current_token.token_type == T_IDENTIFICATOR &&
          strcmp(ctx->current_token.token_lexeme.lexeme, word) == 0;
 }
 
+/**
+ * @brief Vytvoří uzel identifikátoru typu Int
+ *
+ * @param name: jméno proměnné
+ */
 static ASTNode *int_ident(const char *name) {
   ASTNode *n = ast_create_node(AST_IDENTIFIER);
   n->data.string_val = strdup(name);
@@ -1457,18 +1741,38 @@ static ASTNode *int_ident(const char *name) {
   return n;
 }
 
+/**
+ * @brief Vytvoří uzel binární operace s daným typem výsledku
+ *
+ * @param op: operátor
+ * @param l: levý operand
+ * @param r: pravý operand
+ * @param t: typ výsledku
+ */
 static ASTNode *int_binop(int op, ASTNode *l, ASTNode *r, ExprType t) {
   ASTNode *n = ast_make_binop(op, l, r);
   n->expr_type = t;
   return n;
 }
 
+/**
+ * @brief Vytvoří celočíselný literál
+ *
+ * @param v: hodnota
+ */
 static ASTNode *int_literal(int v) {
   ASTNode *n = ast_make_int(v);
   n->expr_type = EXPR_TYPE_INT;
   return n;
 }
 
+/**
+ * @brief Vytvoří definici nebo přiřazení proměnné typu Int
+ *
+ * @param type: AST_VAR_DECL, nebo AST_ASSIGNMENT
+ * @param name: jméno proměnné
+ * @param e: přiřazovaný výraz
+ */
 static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *e) {
   ASTNode *n = ast_create_node(type);
   n->data.var_assign.identifier = strdup(name);
@@ -1477,12 +1781,24 @@ static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *e) {
   return n;
 }
 
+/**
+ * @brief Zabalí seznam příkazů do uzlu AST_BLOCK
+ *
+ * @param statements: první příkaz seznamu
+ */
 static ASTNode *block_of(ASTNode *statements) {
   ASTNode *b = ast_create_node(AST_BLOCK);
   b->data.block.statements = statements;
   return b;
 }
 
+/**
+ * @brief Zpracuje výraz a ověří jeho typ
+ *
+ * @param ctx: kontext parseru
+ * @param want: požadovaný typ výrazu
+ * @param e: uzel AST výrazu
+ */
 static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **e) {
   ExprType t = EXPR_TYPE_UNKNOWN;
   int status = parse_expression(ctx, e, &t);
@@ -1491,12 +1807,24 @@ static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **e) {
   return status;
 }
 
+/**
+ * @brief Vrátí operand výrazu bez unárních operátorů
+ *
+ * @param e: výraz
+ */
 static ASTNode *strip_unary(ASTNode *e) {
   while (e->type == AST_UNARY_OP)
     e = e->data.unary_op.operand;
   return e;
 }
 
+/**
+ * @brief Zpracuje cyklus for a převede jej na cyklus while (pravidla 45, 55–65)
+ *
+ * @param ctx: kontext parseru, aktuální token je for
+ * @param current_indent: odsazení řádku s for
+ * @param info: informace o příkazu, uzel je řetězec příkazů
+ */
 static int parse_for_statement(ParserCtx *ctx, int current_indent,
                                StmtInfo *info) {
   int status;
