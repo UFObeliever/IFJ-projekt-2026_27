@@ -369,7 +369,7 @@ static int parse_function_list(ParserCtx *ctx) {
       return status;
     return parse_function_list(ctx);
   }
-  fprintf(stderr, "parse_function_list error: token %d shit happens",
+  fprintf(stderr, "parse_function_list error: token %d",
           ctx->current_token.token_type);
   return ERR_SYNTAX;
 }

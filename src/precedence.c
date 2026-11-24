@@ -1,3 +1,17 @@
+/**
+ * @file precedence.c
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Implementace precedenční analýzy výrazů, typových kontrol a volání.
+ *
+ * Zpracovává binární a unární operátory, závorky, volání funkcí a tečkové
+ * (vestavěné i rozšiřující) metody se skládáním uzlů AST.
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #include "precedence.h"
 #include <stdbool.h>
 #include <stdio.h>
