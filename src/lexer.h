@@ -1,12 +1,22 @@
+/**
+ * @file lexer.h
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Rozhraní lexikálního analyzátoru.
+ *
+ * Obsahuje typy tokenů, kontext lexeru a funkce pro jeho inicializaci,
+ * získávání dalších tokenů ze vstupu a uvolnění.
+ *
+ * @author Matěj Okruhlica (xokruhm00)
+ */
+
 #ifndef LEXER_H
 #define LEXER_H
 
 #include "DynBuff.h"
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #define INTERP_MAX_DEPTH 32
 
@@ -64,79 +74,6 @@ typedef enum TokenType {
   T_KW_FOR, // for
 } TokenType;
 
-typedef enum State {
-  S_START,      // stav start
-  S_ID_1,       // IDENTIFICATOR
-  S_UNDERSCORE, // IDENTIFICATOR SOLO UNDERSCORE CHECK
-  S_INT_ZERO,   // INTEGER ONLY SOLO ZERO CHECK
-  S_INT,        // INTEGER
-  S_INT_UNDERSCORE,
-  S_DOT_DOUBLE, // S_DOUBLE ORIGINALLY
-  S_DOUBLE_E,
-  S_DOUBLE_E_SIGN, // DOUBLE +/- OPTIONAL
-  S_DOUBLE_AFTER_E,
-  S_DOUBLE_UNDERSCORE_AFTER_E,   // Koncový stav floatu
-  S_DOUBLE_UNDERSCORE_AFTER_DOT, //
-  S_LTE,           // state less than or equal (pro porovnávací operátory)
-  S_LT,            // state less than
-  S_GTE,           // state greater than or equal to
-  S_GT,            // state greater than
-  S_NOT_EQUAL,     // State not equal
-  S_ASSIGN,        // State assign
-  S_STR_START,     // Q1 STRING
-  S_STR_END,       // Q2
-  S_STR_IN_STR,    // Q3
-  S_STR_BACKSLASH, // Q4
-  S_STR_ESC_SEQ,   // Q5 STRING END
-  S_STR_NEWLINE_CHAR,
-  S_STR_MULTILINE_START, // State in multiline str
-  S_STR_MULTILINE_END,   // End of multiline str
-  S_MSTR_START_1,        // Q1 MULT. LINE STRING
-  S_MSTR_START_2,        // Q2
-  S_MSTR_START_3,        // Q3
-  S_MSTR_IN_STR,         // Q8
-  S_MSTR_AFTER_NL,       // Q9
-  S_MSTR_END_1,          // Q4
-  S_MSTR_END_2,          // Q5
-  S_MSTR_END_3,          // Q6 MULT LINE STRING END
-  S_BACKSLASH_COMM,      // Q1 COMMENTS
-  S_SINGLE_COMM_START,   // Q2
-  S_SINGLE_COMM_END,     // Q3 SINGLE LINE COMMENT
-  S_START_LINE_COMMENT,  // CHECK THIS IS IT IS FOR NESTED LINE COMMENTS
-  S_IN_LINE_COMMENT,
-  S_START_BLOCK_COMMENT_1,
-  S_IN_BLOCK_COMMENT,
-  S_BLOCK_COMMENT_END_1,
-  S_BLOCK_COMMENT_END_2,
-  S_INDENT_START,
-  S_INDENT_HAS_TAB,
-  S_IN_COM,      // S_IN_STR
-  S_MCOM_SINGLE, // MSTR -> nahrazeno MCOM
-  S_MCOM_SINGLE_END_STAR,
-  S_MCOM_SINGLE_END,
-  S_MCOM_MULTILINE,
-  S_MCOM_SINGLE_NEST_BACKSLASH,
-  S_MCOM_SINGLE_NEST_STAR_START,
-  S_MCOM_SINGLE_NEST_STAR_STAR,
-  S_MCOM_MULT_STAR,
-  S_MCOM_MULT_NEST_BACKSLASH,
-  S_MCOM_MULT_BACKSLASH,
-  S_MCOM_MULT_END,
-  S_MAIN_AT,
-  S_MAIN_M,
-  S_MAIN_A,
-  S_MAIN_I,
-  S_MAIN_N,
-  S_DOT_CHECK_DOUBLE,
-  S_ISTR_START,
-  S_ISTR_QUOTE,
-  S_ISTR_BODY,
-  S_ISTR_BACKSLASH,
-  S_ISTR_DOLLAR,
-  S_ISTR_ID,
-  S_ISTR_MQUOTES,
-} State;
-
 typedef struct {
   TokenType type;
   const char *lexeme;
@@ -177,18 +114,6 @@ typedef struct {
   InterpLevel interp[INTERP_MAX_DEPTH];
 } LexerCtx;
 
-// Uvolní paměť tokenu
-void free_token(Token t);
-
-// Funkce na počítání whitespace
-Token lex_indents(LexerCtx *ctx);
-
-// Funkce na řešení integer / double
-Token lex_numbers(LexerCtx *ctx);
-
-// Fce na řešení stringu / vnořené str
-Token lex_string(LexerCtx *ctx);
-
 /**
  * @brief Funkce tvořící tokeny (filtruje EOL tokeny)
  *
@@ -216,20 +141,15 @@ void lexer_free(LexerCtx *ctx);
  */
 const char *token_type_to_string(TokenType token);
 
-Token lex_numbers(LexerCtx *ctx);
-
-Token lex_string(LexerCtx *ctx);
-
-Token lex_main_func(LexerCtx *ctx);
-
 void print_token(const Token *token);
 
-Token lex_main_func(LexerCtx *ctx);
 #ifdef NDEBUG
 #define DEBUG_LOG(fmt, ...) ((void)0)
 #else
 #define DEBUG_LOG(fmt, ...)                                                    \
-  fprintf(stderr, "[%s:%d](%s)", __FILE__, __LINE__, __func__);                \
-  fprintf(stderr, fmt, ##__VA_ARGS__);
+  do {                                                                         \
+    fprintf(stderr, "[%s:%d](%s)", __FILE__, __LINE__, __func__);              \
+    fprintf(stderr, fmt, ##__VA_ARGS__);                                       \
+  } while (0)
 #endif
 #endif
