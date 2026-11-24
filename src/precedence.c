@@ -312,13 +312,9 @@ static bool is_operand_token(TokenType t) {
   }
 }
 
-static bool is_open_bracket(TokenType t) {
-  return (t == T_OPEN_BRACKET || t == T_OPEN_BRACKET);
-}
+static bool is_open_bracket(TokenType t) { return t == T_OPEN_BRACKET; }
 
-static bool is_close_bracket(TokenType t) {
-  return (t == T_CLOSE_BRACKET || t == T_CLOSE_BRACKET);
-}
+static bool is_close_bracket(TokenType t) { return t == T_CLOSE_BRACKET; }
 
 static bool is_operator_token(TokenType t) {
   switch (t) {
