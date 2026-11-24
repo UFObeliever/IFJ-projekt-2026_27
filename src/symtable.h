@@ -12,7 +12,7 @@
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
-#include "Error.h"
+#include "error.h"
 #include "lexer.h"
 #include <stdbool.h>
 #include <stdio.h>

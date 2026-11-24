@@ -9,8 +9,8 @@
  */
 
 #include "generator.h"
-#include "Error.h"
 #include "dyn_buff.h"
+#include "error.h"
 #include "lexer.h"
 #include "precedence.h"
 #include <stdarg.h>
