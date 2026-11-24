@@ -1,3 +1,14 @@
+/**
+ * @file symtable.h
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Rozhraní tabulky symbolů nad zásobníkem AVL stromů.
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 
@@ -62,29 +73,162 @@ typedef struct symtable {
   int top;
 } symtable;
 
+/**
+ * @brief Inicializuje novou položku symbolu
+ */
 symtable_entry *symtable_entry_init(void);
+
+/**
+ * @brief Uvolní položku symbolu
+ *
+ * @param entry: Položka tabulky symbolů
+ */
 void symtable_entry_dispose(symtable_entry *entry);
 
+/**
+ * @brief Vrátí větší ze dvou celých čísel
+ *
+ * @param a: První číslo
+ * @param b: Druhé číslo
+ */
 int maxInt(int a, int b);
+
+/**
+ * @brief Vrátí výšku AVL podstromu
+ *
+ * @param tree: Kořen podstromu
+ */
 int avl_height(avl_tree *tree);
+
+/**
+ * @brief Vrátí faktor vyvážení uzlu AVL stromu
+ *
+ * @param tree: Uzel AVL stromu
+ */
 int node_balance(avl_tree *tree);
 
+/**
+ * @brief Inicializuje ukazatel na AVL strom
+ *
+ * @param tree: Ukazatel na kořen stromu
+ */
 void avl_init(struct avl_tree **tree);
+
+/**
+ * @brief Vyhledá záznam v AVL stromu podle klíče
+ *
+ * @param tree: Kořen AVL stromu
+ * @param key: Hledaný klíč
+ * @param data: Výstupní ukazatel na položku
+ */
 bool avl_search(struct avl_tree *tree, char *key, symtable_entry **data);
+
+/**
+ * @brief Vloží položku do AVL stromu a vyváží ho
+ *
+ * @param tree: Ukazatel na kořen stromu
+ * @param key: Klíč symbolu
+ * @param data: Vkládaná položka
+ */
 void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data);
+
+/**
+ * @brief Uvolní všechny uzly a data AVL stromu
+ *
+ * @param tree: Ukazatel na kořen stromu
+ */
 void avl_dispose(struct avl_tree **tree);
+
+/**
+ * @brief Provede pravou rotaci AVL stromu
+ *
+ * @param tree: Kořen rotovaného podstromu
+ */
 avl_tree *rotate_right(avl_tree *tree);
+
+/**
+ * @brief Provede levou rotaci AVL stromu
+ *
+ * @param tree: Kořen rotovaného podstromu
+ */
 avl_tree *rotate_left(avl_tree *tree);
+
+/**
+ * @brief Vyváží uzel AVL stromu
+ *
+ * @param tree: Uzel k vyvážení
+ */
 avl_tree *balance(avl_tree *tree);
 
+/**
+ * @brief Inicializuje tabulku symbolů
+ *
+ * @param smt: Tabulka symbolů
+ */
 void smt_init(symtable *smt);
+
+/**
+ * @brief Přidá nový vnořený rozsah
+ *
+ * @param smt: Tabulka symbolů
+ */
 void smt_scope_add(symtable *smt);
+
+/**
+ * @brief Odstraní aktuální rozsah
+ *
+ * @param smt: Tabulka symbolů
+ */
 void smt_scope_remove(symtable *smt);
+
+/**
+ * @brief Vyhledá symbol od aktuálního rozsahu směrem ke globálnímu
+ *
+ * @param smt: Tabulka symbolů
+ * @param key: Název symbolu
+ * @param entry: Výstupní položka symbolu
+ */
 bool smt_search(symtable *smt, char *key, symtable_entry **entry);
+
+/**
+ * @brief Vyhledá symbol pouze v globálním rozsahu
+ *
+ * @param smt: Tabulka symbolů
+ * @param key: Název symbolu
+ * @param entry: Výstupní položka symbolu
+ */
 bool smt_search_global(symtable *smt, char *key, symtable_entry **entry);
+
+/**
+ * @brief Vloží symbol do aktuálního rozsahu
+ *
+ * @param smt: Tabulka symbolů
+ * @param key: Název symbolu
+ * @param entry: Vkládaná položka
+ */
 void smt_insert(symtable *smt, char *key, symtable_entry *entry);
+
+/**
+ * @brief Vloží symbol do globálního rozsahu
+ *
+ * @param smt: Tabulka symbolů
+ * @param key: Název symbolu
+ * @param entry: Vkládaná položka
+ */
 void smt_insert_global(symtable *smt, char *key, symtable_entry *entry);
+
+/**
+ * @brief Uvolní všechny rozsahy a tabulku symbolů
+ *
+ * @param smt: Tabulka symbolů
+ */
 void smt_dispose(symtable *smt);
+
+/**
+ * @brief Vloží vestavěné funkce jazyka do globálního rozsahu
+ *
+ * @param smt: Tabulka symbolů
+ */
 void smt_insert_builtin_funcs(symtable *smt);
 
 #endif

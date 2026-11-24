@@ -1,3 +1,17 @@
+/**
+ * @file symtable.c
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Implementace tabulky symbolů nad zásobníkem AVL stromů.
+ *
+ * Spravuje vnořené rozsahy (index 0 je globální rozsah), vyvažování AVL
+ * uzlů a registraci vestavěných funkcí jazyka.
+ *
+ * @author Alex Oľšavský (xolsava00)
+ * @author Jaroslav Vančura (xvancuj00)
+ */
+
 #include "symtable.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -243,7 +257,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   if (smt == NULL) {
     return;
   }
-  // print
   symtable_entry *entry = symtable_entry_init();
   f_param *func_params = malloc(sizeof(f_param));
   if (func_params == NULL) {
@@ -260,7 +273,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "print", entry);
 
-  // readLine
   entry = symtable_entry_init();
   entry->function = true;
   entry->declared = true;
@@ -270,7 +282,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = NULL;
   smt_insert_global(smt, "readLine", entry);
 
-  // readInt
   entry = symtable_entry_init();
   entry->function = true;
   entry->declared = true;
@@ -280,7 +291,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = NULL;
   smt_insert_global(smt, "readInt", entry);
 
-  //  readDouble
   entry = symtable_entry_init();
   entry->function = true;
   entry->declared = true;
@@ -298,7 +308,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = NULL;
   smt_insert_global(smt, "readBoolean", entry);
 
-  // toStr
   entry = symtable_entry_init();
   func_params = malloc(sizeof(f_param));
   if (func_params == NULL) {
@@ -315,7 +324,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "toStr", entry);
 
-  // toInt
   entry = symtable_entry_init();
   func_params = malloc(sizeof(f_param));
   if (func_params == NULL) {
@@ -332,7 +340,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "toInt", entry);
 
-  // strLength
   entry = symtable_entry_init();
   func_params = malloc(sizeof(f_param));
   if (func_params == NULL) {
@@ -349,7 +356,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "strLength", entry);
 
-  // subStr
   entry = symtable_entry_init();
   func_params = malloc(3 * sizeof(f_param));
   if (func_params == NULL) {
@@ -369,7 +375,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "subStr", entry);
 
-  // ord
   entry = symtable_entry_init();
   func_params = malloc(2 * sizeof(f_param));
   if (func_params == NULL) {
@@ -387,7 +392,6 @@ void smt_insert_builtin_funcs(symtable *smt) {
   entry->f_params = func_params;
   smt_insert_global(smt, "ord", entry);
 
-  // chr
   entry = symtable_entry_init();
   func_params = malloc(sizeof(f_param));
   if (func_params == NULL) {

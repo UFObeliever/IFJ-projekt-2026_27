@@ -5,6 +5,8 @@
  *
  * @brief Rozhraní abstraktního syntaktického stromu (AST).
  *
+ * Definuje typy uzlů, strukturu uzlu AST a funkce pro jejich vytváření
+ * a uvolňování.
  * @author Alex Oľšavský (xolsava00)
  * @author Jaroslav Vančura (xvancuj00)
  */
@@ -37,11 +39,8 @@ typedef enum {
 
 typedef struct ASTNode {
   ASTNodeType type;
-  // ja pridane
-  int expr_type; // hodnota ExprType (EXPR_TYPE_*); u FUNC_DEF návratový typ,
-                 // u VAR_DECL/ASSIGNMENT/parametru typ proměnné
-  bool is_main;  // jen AST_FUNC_DEF
-  // ja pridane
+  int expr_type;
+  bool is_main;
   struct ASTNode *next;
 
   union {
