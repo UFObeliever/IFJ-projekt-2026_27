@@ -21,10 +21,10 @@
 
 #define T_TYPE_BOOLEAN T_KW_BOOLEAN
 
-typedef struct f_param {
+typedef struct FuncParam {
   TokenType type;
   char *name;
-} f_param;
+} FuncParam;
 
 typedef struct SourceMark {
   size_t pos;
@@ -40,7 +40,7 @@ typedef enum BodyState {
   BODY_DONE,
 } BodyState;
 
-typedef struct symtable_entry {
+typedef struct SymtableEntry {
   TokenType type;
   bool declared;
   bool defined;
@@ -48,7 +48,7 @@ typedef struct symtable_entry {
   bool variable;
   bool value;
   int f_param_count;
-  f_param *f_params;
+  FuncParam *f_params;
   int f_list_count;
   int *f_list_sizes;
   BodyState body_state;
@@ -57,33 +57,33 @@ typedef struct symtable_entry {
   int def_indent;
   SourceMark body_start;
   SourceMark body_end;
-} symtable_entry;
+} SymtableEntry;
 
-typedef struct avl_tree {
+typedef struct AvlTree {
   int height;
-  symtable_entry *data;
+  SymtableEntry *data;
   char *key;
-  struct avl_tree *left;
-  struct avl_tree *right;
-} avl_tree;
+  struct AvlTree *left;
+  struct AvlTree *right;
+} AvlTree;
 
-typedef struct symtable {
-  avl_tree **table;
+typedef struct Symtable {
+  AvlTree **table;
   int size;
   int top;
-} symtable;
+} Symtable;
 
 /**
  * @brief Inicializuje novou položku symbolu
  */
-symtable_entry *symtable_entry_init(void);
+SymtableEntry *symtable_entry_init(void);
 
 /**
  * @brief Uvolní položku symbolu
  *
  * @param entry: Položka tabulky symbolů
  */
-void symtable_entry_dispose(symtable_entry *entry);
+void symtable_entry_dispose(SymtableEntry *entry);
 
 /**
  * @brief Vrátí větší ze dvou celých čísel
@@ -98,21 +98,21 @@ int max_int(int a, int b);
  *
  * @param tree: Kořen podstromu
  */
-int avl_height(avl_tree *tree);
+int avl_height(AvlTree *tree);
 
 /**
  * @brief Vrátí faktor vyvážení uzlu AVL stromu
  *
  * @param tree: Uzel AVL stromu
  */
-int node_balance(avl_tree *tree);
+int node_balance(AvlTree *tree);
 
 /**
  * @brief Inicializuje ukazatel na AVL strom
  *
  * @param tree: Ukazatel na kořen stromu
  */
-void avl_init(struct avl_tree **tree);
+void avl_init(struct AvlTree **tree);
 
 /**
  * @brief Vyhledá záznam v AVL stromu podle klíče
@@ -121,7 +121,7 @@ void avl_init(struct avl_tree **tree);
  * @param key: Hledaný klíč
  * @param data: Výstupní ukazatel na položku
  */
-bool avl_search(struct avl_tree *tree, char *key, symtable_entry **data);
+bool avl_search(struct AvlTree *tree, char *key, SymtableEntry **data);
 
 /**
  * @brief Vloží položku do AVL stromu a vyváží ho
@@ -130,56 +130,56 @@ bool avl_search(struct avl_tree *tree, char *key, symtable_entry **data);
  * @param key: Klíč symbolu
  * @param data: Vkládaná položka
  */
-void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data);
+void avl_insert(struct AvlTree **tree, char *key, SymtableEntry *data);
 
 /**
  * @brief Uvolní všechny uzly a data AVL stromu
  *
  * @param tree: Ukazatel na kořen stromu
  */
-void avl_dispose(struct avl_tree **tree);
+void avl_dispose(struct AvlTree **tree);
 
 /**
  * @brief Provede pravou rotaci AVL stromu
  *
  * @param tree: Kořen rotovaného podstromu
  */
-avl_tree *rotate_right(avl_tree *tree);
+AvlTree *rotate_right(AvlTree *tree);
 
 /**
  * @brief Provede levou rotaci AVL stromu
  *
  * @param tree: Kořen rotovaného podstromu
  */
-avl_tree *rotate_left(avl_tree *tree);
+AvlTree *rotate_left(AvlTree *tree);
 
 /**
  * @brief Vyváží uzel AVL stromu
  *
  * @param tree: Uzel k vyvážení
  */
-avl_tree *balance(avl_tree *tree);
+AvlTree *balance(AvlTree *tree);
 
 /**
  * @brief Inicializuje tabulku symbolů
  *
  * @param smt: Tabulka symbolů
  */
-void smt_init(symtable *smt);
+void smt_init(Symtable *smt);
 
 /**
  * @brief Přidá nový vnořený rozsah
  *
  * @param smt: Tabulka symbolů
  */
-void smt_scope_add(symtable *smt);
+void smt_scope_add(Symtable *smt);
 
 /**
  * @brief Odstraní aktuální rozsah
  *
  * @param smt: Tabulka symbolů
  */
-void smt_scope_remove(symtable *smt);
+void smt_scope_remove(Symtable *smt);
 
 /**
  * @brief Vyhledá symbol od aktuálního rozsahu směrem ke globálnímu
@@ -188,7 +188,7 @@ void smt_scope_remove(symtable *smt);
  * @param key: Název symbolu
  * @param entry: Výstupní položka symbolu
  */
-bool smt_search(symtable *smt, char *key, symtable_entry **entry);
+bool smt_search(Symtable *smt, char *key, SymtableEntry **entry);
 
 /**
  * @brief Vyhledá symbol pouze v globálním rozsahu
@@ -197,7 +197,7 @@ bool smt_search(symtable *smt, char *key, symtable_entry **entry);
  * @param key: Název symbolu
  * @param entry: Výstupní položka symbolu
  */
-bool smt_search_global(symtable *smt, char *key, symtable_entry **entry);
+bool smt_search_global(Symtable *smt, char *key, SymtableEntry **entry);
 
 /**
  * @brief Vloží symbol do aktuálního rozsahu
@@ -206,7 +206,7 @@ bool smt_search_global(symtable *smt, char *key, symtable_entry **entry);
  * @param key: Název symbolu
  * @param entry: Vkládaná položka
  */
-void smt_insert(symtable *smt, char *key, symtable_entry *entry);
+void smt_insert(Symtable *smt, char *key, SymtableEntry *entry);
 
 /**
  * @brief Vloží symbol do globálního rozsahu
@@ -215,20 +215,20 @@ void smt_insert(symtable *smt, char *key, symtable_entry *entry);
  * @param key: Název symbolu
  * @param entry: Vkládaná položka
  */
-void smt_insert_global(symtable *smt, char *key, symtable_entry *entry);
+void smt_insert_global(Symtable *smt, char *key, SymtableEntry *entry);
 
 /**
  * @brief Uvolní všechny rozsahy a tabulku symbolů
  *
  * @param smt: Tabulka symbolů
  */
-void smt_dispose(symtable *smt);
+void smt_dispose(Symtable *smt);
 
 /**
  * @brief Vloží vestavěné funkce jazyka do globálního rozsahu
  *
  * @param smt: Tabulka symbolů
  */
-void smt_insert_builtin_funcs(symtable *smt);
+void smt_insert_builtin_funcs(Symtable *smt);
 
 #endif

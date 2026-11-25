@@ -11,8 +11,8 @@
  * @author Matěj Okruhlica (xokruhm00)
  */
 
-#ifndef DYNBUFF_H
-#define DYNBUFF_H
+#ifndef DYN_BUFF_H
+#define DYN_BUFF_H
 #include <stdlib.h>
 
 /**
@@ -70,7 +70,7 @@ static inline void sb_reset(StringBuff *buf) { buf->length = 0; }
 static inline void sb_free(StringBuff *buf) {
   free(buf->data);
   buf->data = NULL;
-};
+}
 
 /**
  * @brief Vytvoří kopii obsahu bufferu jako řetězec
@@ -82,15 +82,6 @@ static inline void sb_free(StringBuff *buf) {
  * @return ukazatel na kopii, pro `buf` rovné NULL vrací NULL
  */
 const char *sb_copy(const StringBuff *buf);
-
-/**
- * @brief Odstraní bílé znaky z konce bufferu
- *
- * Délku bufferu nejdřív zkrátí o dva znaky. Funkce se zatím nikde nepoužívá.
- *
- * @param buff buffer
- */
-void sb_remove_trailing_whitespace(StringBuff *buff);
 
 /**
  * @brief Připojí řetězec na konec bufferu

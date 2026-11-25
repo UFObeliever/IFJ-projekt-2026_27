@@ -1,7 +1,7 @@
-#ifndef _ERRORS_H_
-#define _ERRORS_H_
+#ifndef ERROR_H
+#define ERROR_H
 
-typedef enum error_value {
+typedef enum {
   SUCCESS,      // No error (return value 0)
   LEX_ANAL_ERR, // Error in the program within lexical analysis (incorrect
                 // structure of the current lexeme).

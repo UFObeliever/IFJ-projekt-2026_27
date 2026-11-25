@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-symtable_entry *symtable_entry_init(void) {
-  symtable_entry *entry = calloc(1, sizeof(symtable_entry));
+SymtableEntry *symtable_entry_init(void) {
+  SymtableEntry *entry = calloc(1, sizeof(SymtableEntry));
   if (entry == NULL) {
     fprintf(stderr, "Symtable entry memory allocation failed.\n");
     exit(COMPILER_ERR);
@@ -34,9 +34,11 @@ symtable_entry *symtable_entry_init(void) {
   return entry;
 }
 
-void symtable_entry_dispose(symtable_entry *entry) {
+void symtable_entry_dispose(SymtableEntry *entry) {
   if (entry != NULL) {
     if (entry->function && entry->f_params != NULL) {
+      for (int i = 0; i < entry->f_param_count; i++)
+        free(entry->f_params[i].name);
       free(entry->f_params);
     }
     free(entry->f_list_sizes);
@@ -46,23 +48,23 @@ void symtable_entry_dispose(symtable_entry *entry) {
 
 int max_int(int a, int b) { return (a > b) ? a : b; }
 
-int avl_height(avl_tree *tree) {
+int avl_height(AvlTree *tree) {
   if (tree == NULL) {
     return 0;
   }
   return tree->height;
 }
 
-int node_balance(avl_tree *tree) {
+int node_balance(AvlTree *tree) {
   if (tree == NULL) {
     return 0;
   }
   return avl_height(tree->left) - avl_height(tree->right);
 }
 
-void avl_init(struct avl_tree **tree) { *tree = NULL; }
+void avl_init(struct AvlTree **tree) { *tree = NULL; }
 
-bool avl_search(struct avl_tree *tree, char *key, symtable_entry **data) {
+bool avl_search(struct AvlTree *tree, char *key, SymtableEntry **data) {
   if (tree == NULL) {
     return false;
   }
@@ -77,9 +79,9 @@ bool avl_search(struct avl_tree *tree, char *key, symtable_entry **data) {
   }
 }
 
-void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data) {
+void avl_insert(struct AvlTree **tree, char *key, SymtableEntry *data) {
   if (*tree == NULL) {
-    *tree = malloc(sizeof(avl_tree));
+    *tree = malloc(sizeof(AvlTree));
     if (*tree == NULL) {
       fprintf(stderr, "Memory allocation error.\n");
       exit(COMPILER_ERR);
@@ -106,7 +108,7 @@ void avl_insert(struct avl_tree **tree, char *key, symtable_entry *data) {
   *tree = balance(*tree);
 }
 
-void avl_dispose(struct avl_tree **tree) {
+void avl_dispose(struct AvlTree **tree) {
   if (*tree == NULL) {
     return;
   }
@@ -118,25 +120,27 @@ void avl_dispose(struct avl_tree **tree) {
   *tree = NULL;
 }
 
-avl_tree *rotate_right(avl_tree *tree) {
-  avl_tree *tmp = tree->left;
-  tree->left = tmp->right;
-  tmp->right = tree;
+AvlTree *rotate_right(AvlTree *tree) {
+  AvlTree *new_root = tree->left;
+  tree->left = new_root->right;
+  new_root->right = tree;
   tree->height = 1 + max_int(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + max_int(avl_height(tmp->left), avl_height(tmp->right));
-  return tmp;
+  new_root->height =
+      1 + max_int(avl_height(new_root->left), avl_height(new_root->right));
+  return new_root;
 }
 
-avl_tree *rotate_left(avl_tree *tree) {
-  avl_tree *tmp = tree->right;
-  tree->right = tmp->left;
-  tmp->left = tree;
+AvlTree *rotate_left(AvlTree *tree) {
+  AvlTree *new_root = tree->right;
+  tree->right = new_root->left;
+  new_root->left = tree;
   tree->height = 1 + max_int(avl_height(tree->left), avl_height(tree->right));
-  tmp->height = 1 + max_int(avl_height(tmp->left), avl_height(tmp->right));
-  return tmp;
+  new_root->height =
+      1 + max_int(avl_height(new_root->left), avl_height(new_root->right));
+  return new_root;
 }
 
-avl_tree *balance(avl_tree *tree) {
+AvlTree *balance(AvlTree *tree) {
   int balance_factor = node_balance(tree);
   if (balance_factor > 1) {
     if (node_balance(tree->left) < 0) {
@@ -153,10 +157,10 @@ avl_tree *balance(avl_tree *tree) {
   return tree;
 }
 
-void smt_init(symtable *smt) {
+void smt_init(Symtable *smt) {
   if (smt != NULL) {
     smt->size = 256;
-    smt->table = malloc(sizeof(avl_tree *) * smt->size);
+    smt->table = malloc(sizeof(AvlTree *) * smt->size);
     if (smt->table == NULL) {
       fprintf(stderr, "Memory allocation error.\n");
       exit(COMPILER_ERR);
@@ -167,7 +171,7 @@ void smt_init(symtable *smt) {
   }
 }
 
-void smt_scope_add(symtable *smt) {
+void smt_scope_add(Symtable *smt) {
   if (smt != NULL) {
     if (smt->top + 1 >= smt->size) {
       fprintf(stderr, "Symbol table scope adding error.\n");
@@ -178,7 +182,7 @@ void smt_scope_add(symtable *smt) {
   }
 }
 
-void smt_scope_remove(symtable *smt) {
+void smt_scope_remove(Symtable *smt) {
   if (smt != NULL) {
     if (smt->top < 0) {
       fprintf(stderr, "Symbol table scope removal error.\n");
@@ -189,7 +193,7 @@ void smt_scope_remove(symtable *smt) {
   }
 }
 
-bool smt_search(symtable *smt, char *key, symtable_entry **entry) {
+bool smt_search(Symtable *smt, char *key, SymtableEntry **entry) {
   if (smt != NULL && entry != NULL) {
     int idx = smt->top;
     while (idx >= 0) {
@@ -202,7 +206,7 @@ bool smt_search(symtable *smt, char *key, symtable_entry **entry) {
   return false;
 }
 
-bool smt_search_global(symtable *smt, char *key, symtable_entry **entry) {
+bool smt_search_global(Symtable *smt, char *key, SymtableEntry **entry) {
   if (smt != NULL && entry != NULL) {
     if (avl_search(smt->table[0], key, entry)) {
       return true;
@@ -211,14 +215,14 @@ bool smt_search_global(symtable *smt, char *key, symtable_entry **entry) {
   return false;
 }
 
-void smt_insert(symtable *smt, char *key, symtable_entry *entry) {
+void smt_insert(Symtable *smt, char *key, SymtableEntry *entry) {
   if (smt != NULL && key != NULL && entry != NULL) {
     if (smt->top < 0) {
       fprintf(stderr, "Symtable insertion error.\n");
       exit(COMPILER_ERR);
     }
-    symtable_entry *temp = NULL;
-    if (avl_search(smt->table[smt->top], key, &temp)) {
+    SymtableEntry *existing = NULL;
+    if (avl_search(smt->table[smt->top], key, &existing)) {
       fprintf(stderr, "Redefinition error\n");
       exit(REDEF_FN_VAR_ERR);
     }
@@ -226,12 +230,12 @@ void smt_insert(symtable *smt, char *key, symtable_entry *entry) {
   }
 }
 
-void smt_insert_global(symtable *smt, char *key, symtable_entry *entry) {
+void smt_insert_global(Symtable *smt, char *key, SymtableEntry *entry) {
   if (smt == NULL || key == NULL || entry == NULL) {
     return;
   }
 
-  symtable_entry *head = NULL;
+  SymtableEntry *head = NULL;
 
   if (avl_search(smt->table[0], key, &head)) {
     fprintf(stderr, "Redefinition error: global symbol '%s' already exists\n",
@@ -242,7 +246,7 @@ void smt_insert_global(symtable *smt, char *key, symtable_entry *entry) {
   avl_insert(&smt->table[0], key, entry);
 }
 
-void smt_dispose(symtable *smt) {
+void smt_dispose(Symtable *smt) {
   if (smt != NULL) {
     for (int i = smt->top; i >= 0; i--) {
       avl_dispose(&smt->table[i]);
@@ -253,18 +257,18 @@ void smt_dispose(symtable *smt) {
   }
 }
 
-void smt_insert_builtin_funcs(symtable *smt) {
+void smt_insert_builtin_funcs(Symtable *smt) {
   if (smt == NULL) {
     return;
   }
-  symtable_entry *entry = symtable_entry_init();
-  f_param *func_params = malloc(sizeof(f_param));
+  SymtableEntry *entry = symtable_entry_init();
+  FuncParam *func_params = malloc(sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value")};
+  func_params[0] = (FuncParam){.name = strdup("value")};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -309,13 +313,13 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "readBoolean", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(sizeof(f_param));
+  func_params = malloc(sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_ERROR};
+  func_params[0] = (FuncParam){.name = strdup("value"), .type = T_ERROR};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -325,13 +329,13 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "toStr", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(sizeof(f_param));
+  func_params = malloc(sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_DOUBLE};
+  func_params[0] = (FuncParam){.name = strdup("value"), .type = T_KW_DOUBLE};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -341,13 +345,13 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "toInt", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(sizeof(f_param));
+  func_params = malloc(sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
+  func_params[0] = (FuncParam){.name = strdup("value"), .type = T_KW_STRING};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -357,15 +361,15 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "strLength", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(3 * sizeof(f_param));
+  func_params = malloc(3 * sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
-  func_params[1] = (f_param){.name = strdup("start"), .type = T_KW_INT};
-  func_params[2] = (f_param){.name = strdup("end"), .type = T_KW_INT};
+  func_params[0] = (FuncParam){.name = strdup("value"), .type = T_KW_STRING};
+  func_params[1] = (FuncParam){.name = strdup("start"), .type = T_KW_INT};
+  func_params[2] = (FuncParam){.name = strdup("end"), .type = T_KW_INT};
 
   entry->function = true;
   entry->declared = true;
@@ -376,14 +380,14 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "subStr", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(2 * sizeof(f_param));
+  func_params = malloc(2 * sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("value"), .type = T_KW_STRING};
-  func_params[1] = (f_param){.name = strdup("index"), .type = T_KW_INT};
+  func_params[0] = (FuncParam){.name = strdup("value"), .type = T_KW_STRING};
+  func_params[1] = (FuncParam){.name = strdup("index"), .type = T_KW_INT};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;
@@ -393,13 +397,13 @@ void smt_insert_builtin_funcs(symtable *smt) {
   smt_insert_global(smt, "ord", entry);
 
   entry = symtable_entry_init();
-  func_params = malloc(sizeof(f_param));
+  func_params = malloc(sizeof(FuncParam));
   if (func_params == NULL) {
     free(entry);
     smt_dispose(smt);
     exit(COMPILER_ERR);
   }
-  func_params[0] = (f_param){.name = strdup("code"), .type = T_KW_INT};
+  func_params[0] = (FuncParam){.name = strdup("code"), .type = T_KW_INT};
   entry->function = true;
   entry->declared = true;
   entry->defined = true;

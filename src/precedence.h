@@ -9,8 +9,8 @@
  * @author Jaroslav Vančura (xvancuj00)
  */
 
-#ifndef PRECEDENCETABLE_H
-#define PRECEDENCETABLE_H
+#ifndef PRECEDENCE_H
+#define PRECEDENCE_H
 
 #include "ast.h"
 #include "error.h"

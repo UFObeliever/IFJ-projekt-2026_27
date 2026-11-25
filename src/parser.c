@@ -27,15 +27,11 @@
 #include <string.h>
 
 /**
- * @brief Návratový kód syntaktické chyby
- */
-#define ERR_SYNTAX 2
-/**
  * @brief Ukončí volající funkci s chybou 1, je-li token lexikální chybou
  *
  * @param token: kontrolovaný token
  */
-#define TOKEN_CHEK(token)                                                      \
+#define TOKEN_CHECK(token)                                                     \
   do {                                                                         \
     if ((token).token_type == T_ERROR) {                                       \
       return LEX_ANAL_ERR;                                                     \
@@ -53,7 +49,7 @@ typedef struct {
 
 typedef struct {
   const char *name;
-  f_param *params;
+  FuncParam *params;
   int param_count;
   int list_count;
   int *list_sizes;
@@ -102,12 +98,12 @@ static Token raw_token(ParserCtx *ctx, size_t idx);
 /**
  * @brief Převede typ z klíčového slova na typ výrazu
  *
- * @param t: token typu (Int, Double, String, Unit, Boolean)
+ * @param tok_type: token typu (Int, Double, String, Unit, Boolean)
  */
-static ExprType expr_from_kw(TokenType t) {
-  if (t == T_TYPE_BOOLEAN)
+static ExprType expr_from_kw(TokenType tok_type) {
+  if (tok_type == T_TYPE_BOOLEAN)
     return EXPR_TYPE_BOOL;
-  switch (t) {
+  switch (tok_type) {
   case T_KW_INT:
     return EXPR_TYPE_INT;
   case T_KW_DOUBLE:
@@ -126,18 +122,18 @@ static ExprType expr_from_kw(TokenType t) {
  *
  * @param head: začátek seznamu
  * @param tail: poslední prvek seznamu, po připojení se posune na konec
- * @param n: připojovaný uzel, NULL se ignoruje
+ * @param node: připojovaný uzel, NULL se ignoruje
  */
-static void list_append(ASTNode **head, ASTNode **tail, ASTNode *n) {
-  if (!n)
+static void list_append(ASTNode **head, ASTNode **tail, ASTNode *node) {
+  if (!node)
     return;
   if (*tail)
-    (*tail)->next = n;
+    (*tail)->next = node;
   else
-    *head = n;
-  while (n->next)
-    n = n->next;
-  *tail = n;
+    *head = node;
+  while (node->next)
+    node = node->next;
+  *tail = node;
 }
 
 /**
@@ -157,13 +153,13 @@ static Token raw_token(ParserCtx *ctx, size_t idx) {
 
     if (ctx->tokens_len == ctx->tokens_cap) {
       size_t cap = ctx->tokens_cap ? ctx->tokens_cap * 2 : 256;
-      Token *tmp = realloc(ctx->tokens, cap * sizeof(Token));
-      if (tmp == NULL) {
-        fprintf(stderr, "...");
+      Token *resized = realloc(ctx->tokens, cap * sizeof(Token));
+      if (resized == NULL) {
+        fprintf(stderr, "Chyba alokace pameti pro tokeny\n");
         exit(COMPILER_ERR);
       }
 
-      ctx->tokens = tmp;
+      ctx->tokens = resized;
       ctx->tokens_cap = cap;
     }
     ctx->tokens[ctx->tokens_len++] = get_next_token(ctx->lexer);
@@ -177,21 +173,22 @@ static Token raw_token(ParserCtx *ctx, size_t idx) {
  * @param ctx: kontext parseru
  */
 static SourceMark mark_get(const ParserCtx *ctx) {
-  SourceMark m = {ctx->pos, ctx->current_token, ctx->line_indent, ctx->at_bol};
-  return m;
+  SourceMark mark = {ctx->pos, ctx->current_token, ctx->line_indent,
+                     ctx->at_bol};
+  return mark;
 }
 
 /**
  * @brief Vrátí čtení na dříve uloženou pozici
  *
  * @param ctx: kontext parseru
- * @param m: pozice získaná funkcí mark_get
+ * @param mark: pozice získaná funkcí mark_get
  */
-static void mark_set(ParserCtx *ctx, const SourceMark *m) {
-  ctx->pos = m->pos;
-  ctx->current_token = m->tok;
-  ctx->line_indent = m->line_indent;
-  ctx->at_bol = m->at_bol;
+static void mark_set(ParserCtx *ctx, const SourceMark *mark) {
+  ctx->pos = mark->pos;
+  ctx->current_token = mark->tok;
+  ctx->line_indent = mark->line_indent;
+  ctx->at_bol = mark->at_bol;
 }
 
 /**
@@ -200,19 +197,19 @@ static void mark_set(ParserCtx *ctx, const SourceMark *m) {
  * @param ctx: kontext parseru
  */
 static Token fetch_token(ParserCtx *ctx) {
-  Token t = raw_token(ctx, ctx->pos++);
+  Token tok = raw_token(ctx, ctx->pos++);
 
-  if (t.token_type == T_EOL) {
+  if (tok.token_type == T_EOL) {
     ctx->line_indent = 0;
     ctx->at_bol = true;
-  } else if (t.token_type == T_INDENTS) {
+  } else if (tok.token_type == T_INDENTS) {
     if (ctx->at_bol)
-      ctx->line_indent = t.token_indents.count;
+      ctx->line_indent = tok.token_indents.count;
     ctx->at_bol = false;
   } else {
     ctx->at_bol = false;
   }
-  return t;
+  return tok;
 }
 
 /**
@@ -264,7 +261,7 @@ static int match(ParserCtx *ctx, TokenType expected) {
   if (ctx->current_token.token_type == T_ERROR) {
     return LEX_ANAL_ERR;
   }
-  return ERR_SYNTAX;
+  return SYN_ANAL_ERR;
 }
 
 Token look_next_eol(ParserCtx *parser) { return parser->current_token; }
@@ -277,15 +274,27 @@ Token consume_token(ParserCtx *parser) {
 
 Token peek_token(ParserCtx *parser) {
   size_t i = parser->pos;
-  Token t = raw_token(parser, i);
-  while (t.token_type == T_WHITESPACE_SEP || t.token_type == T_INDENTS ||
-         t.token_type == T_TAB) {
-    t = raw_token(parser, ++i);
+  Token tok = raw_token(parser, i);
+  while (tok.token_type == T_WHITESPACE_SEP || tok.token_type == T_INDENTS ||
+         tok.token_type == T_TAB) {
+    tok = raw_token(parser, ++i);
   }
-  return t;
+  return tok;
 }
 
 void parser_free(ParserCtx *ctx) {
+  for (size_t i = 0; i < ctx->tokens_len; i++) {
+    switch (ctx->tokens[i].token_type) {
+    case T_INT_LITERAL:
+    case T_DOUBLE_LITERAL:
+    case T_STRING_LITERAL:
+    case T_IDENTIFICATOR:
+      free((void *)ctx->tokens[i].token_lexeme.lexeme);
+      break;
+    default:
+      break;
+    }
+  }
   free(ctx->tokens);
   ctx->tokens = NULL;
   ctx->tokens_len = ctx->tokens_cap = ctx->pos = 0;
@@ -299,7 +308,7 @@ int parse_program(ParserCtx *ctx) {
   ctx->line_indent = 0;
   ctx->at_bol = true;
   advance_(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   int status;
   if ((status = parse_prolog(ctx)) != 0)
     return status;
@@ -323,7 +332,7 @@ static int parse_prolog(ParserCtx *ctx) {
          ctx->current_token.token_type == T_WHITESPACE_SEP ||
          ctx->current_token.token_type == T_INDENTS) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
   }
 
   if ((status = match(ctx, T_KW_IMPORT)) != 0)
@@ -349,7 +358,7 @@ static int parse_function_list(ParserCtx *ctx) {
          (ctx->current_token.token_type == T_INDENTS &&
           ctx->current_token.token_indents.count == 0)) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
   }
   if (ctx->current_token.token_type == T_EOF) {
     return 0;
@@ -359,21 +368,21 @@ static int parse_function_list(ParserCtx *ctx) {
   if (ctx->current_token.token_type == T_FUNC_MAIN ||
       ctx->current_token.token_type == T_KW_DEF) {
     if (ctx->line_indent != 0)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
     if ((status = parse_defsingle(ctx, NULL)) != 0)
       return status;
     return parse_function_list(ctx);
   }
   if (ctx->current_token.token_type == T_EXTENSION) {
     if (ctx->line_indent != 0)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
     if ((status = parse_extension(ctx)) != 0)
       return status;
     return parse_function_list(ctx);
   }
-  fprintf(stderr, "parse_function_list error: token %d",
+  fprintf(stderr, "Neocekavany token %d mimo definici funkce\n",
           ctx->current_token.token_type);
-  return ERR_SYNTAX;
+  return SYN_ANAL_ERR;
 }
 
 /**
@@ -391,11 +400,11 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
   case T_KW_BOOLEAN:
     *out = ctx->current_token.token_type;
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     return 0;
   default:
-    fprintf(stderr, "error: unknown type was returned!!");
-    return ERR_SYNTAX;
+    fprintf(stderr, "Ocekavan nazev typu\n");
+    return SYN_ANAL_ERR;
   }
 }
 
@@ -406,7 +415,7 @@ static int parse_type(ParserCtx *ctx, TokenType *out) {
  * @param params: pole parametrů funkce, podle potřeby se zvětší
  * @param count: počet parametrů v poli, zvýší se o načtené parametry
  */
-static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
+static int parse_parameters(ParserCtx *ctx, FuncParam **params, int *count) {
   int status;
 
   if ((status = match(ctx, T_OPEN_BRACKET)) != 0)
@@ -417,15 +426,14 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
   while (true) {
     if (ctx->current_token.token_type == T_EOL) {
       advance(ctx);
-      TOKEN_CHEK(ctx->current_token);
+      TOKEN_CHECK(ctx->current_token);
     }
     if (ctx->current_token.token_type != T_IDENTIFICATOR &&
         ctx->current_token.token_type != T_CLOSE_BRACKET)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
     if (ctx->current_token.token_type == T_CLOSE_BRACKET) {
-      fprintf(stderr, "returning found )\n");
       advance(ctx);
-      TOKEN_CHEK(ctx->current_token);
+      TOKEN_CHECK(ctx->current_token);
       return 0;
     }
     const char *pname = ctx->current_token.token_lexeme.lexeme;
@@ -434,7 +442,7 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
         return REDEF_FN_VAR_ERR;
     }
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
 
     if ((status = match(ctx, T_DOUBLE_DOT)) != 0)
       return status;
@@ -442,26 +450,27 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
     if ((status = parse_type(ctx, &ptype)) != 0)
       return status;
 
-    f_param *tmp = realloc(*params, sizeof(f_param) * (size_t)(*count + 1));
-    if (tmp == NULL)
+    FuncParam *resized =
+        realloc(*params, sizeof(FuncParam) * (size_t)(*count + 1));
+    if (resized == NULL)
       return COMPILER_ERR;
-    *params = tmp;
+    *params = resized;
     (*params)[*count].name = strdup(pname);
     (*params)[*count].type = ptype;
     (*count)++;
 
     if (ctx->current_token.token_type == T_COMMA) {
       advance(ctx);
-      TOKEN_CHEK(ctx->current_token);
+      TOKEN_CHECK(ctx->current_token);
       if (ctx->current_token.token_type == T_CLOSE_BRACKET)
-        return ERR_SYNTAX;
+        return SYN_ANAL_ERR;
       continue;
     }
     break;
   }
   if (ctx->current_token.token_type == T_EOL) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
   }
   return match(ctx, T_CLOSE_BRACKET);
 }
@@ -472,7 +481,7 @@ static int parse_parameters(ParserCtx *ctx, f_param **params, int *count) {
  * @param params: pole parametrů
  * @param count: počet parametrů v poli
  */
-static void free_params(f_param *params, int count) {
+static void free_params(FuncParam *params, int count) {
   for (int i = 0; i < count; i++)
     free(params[i].name);
   free(params);
@@ -482,58 +491,59 @@ static void free_params(f_param *params, int count) {
  * @brief Zpracuje hlavičku funkce až po znak = (pravidla 8–12, 18–19)
  *
  * @param ctx: kontext parseru
- * @param h: načtená hlavička
+ * @param header: načtená hlavička
  */
-static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
+static int parse_function_header(ParserCtx *ctx, FuncHeader *header) {
   int status;
-  h->name = NULL;
-  h->params = NULL;
-  h->param_count = 0;
-  h->list_count = 0;
-  h->list_sizes = NULL;
-  h->ret_type = T_ERROR;
-  h->is_main = false;
-  h->indent = ctx->line_indent;
+  header->name = NULL;
+  header->params = NULL;
+  header->param_count = 0;
+  header->list_count = 0;
+  header->list_sizes = NULL;
+  header->ret_type = T_ERROR;
+  header->is_main = false;
+  header->indent = ctx->line_indent;
 
   if (ctx->current_token.token_type == T_FUNC_MAIN) {
-    h->is_main = true;
+    header->is_main = true;
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     if (ctx->current_token.token_type == T_EOL) {
       advance(ctx);
-      TOKEN_CHEK(ctx->current_token);
+      TOKEN_CHECK(ctx->current_token);
     }
     if (match(ctx, T_KW_DEF) != 0)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
   } else if (ctx->current_token.token_type == T_KW_DEF) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
   } else {
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   }
 
   if (ctx->current_token.token_type != T_IDENTIFICATOR)
-    return ERR_SYNTAX;
-  h->name = ctx->current_token.token_lexeme.lexeme;
+    return SYN_ANAL_ERR;
+  header->name = ctx->current_token.token_lexeme.lexeme;
   advance(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
 
   while (ctx->current_token.token_type == T_OPEN_BRACKET) {
-    const int before = h->param_count;
-    if ((status = parse_parameters(ctx, &h->params, &h->param_count)) != 0)
+    const int before = header->param_count;
+    if ((status =
+             parse_parameters(ctx, &header->params, &header->param_count)) != 0)
       return status;
-    int *tmp =
-        realloc(h->list_sizes, sizeof(int) * (size_t)(h->list_count + 1));
-    if (tmp == NULL)
+    int *resized = realloc(header->list_sizes,
+                           sizeof(int) * (size_t)(header->list_count + 1));
+    if (resized == NULL)
       return COMPILER_ERR;
-    h->list_sizes = tmp;
-    h->list_sizes[h->list_count++] = h->param_count - before;
+    header->list_sizes = resized;
+    header->list_sizes[header->list_count++] = header->param_count - before;
   }
 
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
-    if ((status = parse_type(ctx, &h->ret_type)) != 0)
+    TOKEN_CHECK(ctx->current_token);
+    if ((status = parse_type(ctx, &header->ret_type)) != 0)
       return status;
   }
 
@@ -544,37 +554,37 @@ static int parse_function_header(ParserCtx *ctx, FuncHeader *h) {
  * @brief Vloží funkci do globální tabulky symbolů
  *
  * @param ctx: kontext parseru
- * @param h: hlavička funkce, záznam převezme její parametry
+ * @param header: hlavička funkce, záznam převezme její parametry
  * @param def_pos: pozice tokenu def v proudu tokenů
  */
-static symtable_entry *register_function(ParserCtx *ctx, const FuncHeader *h,
-                                         size_t def_pos) {
-  symtable_entry *en = symtable_entry_init();
+static SymtableEntry *
+register_function(ParserCtx *ctx, const FuncHeader *header, size_t def_pos) {
+  SymtableEntry *en = symtable_entry_init();
   en->function = true;
   en->declared = true;
   en->defined = true;
-  en->type = h->ret_type;
-  en->f_param_count = h->param_count;
-  en->f_params = h->params;
-  en->f_list_count = h->list_count;
-  en->f_list_sizes = h->list_sizes;
+  en->type = header->ret_type;
+  en->f_param_count = header->param_count;
+  en->f_params = header->params;
+  en->f_list_count = header->list_count;
+  en->f_list_sizes = header->list_sizes;
   en->body_state = BODY_PENDING;
-  en->is_main = h->is_main;
+  en->is_main = header->is_main;
   en->def_pos = def_pos;
-  en->def_indent = h->indent;
+  en->def_indent = header->indent;
   en->body_start = mark_get(ctx);
-  smt_insert_global(&ctx->smt, (char *)h->name, en);
+  smt_insert_global(&ctx->smt, (char *)header->name, en);
   return en;
 }
 
 /**
  * @brief Říká, zda poslední příkaz bloku dává hodnotu
  *
- * @param s: informace o posledním příkazu bloku
+ * @param stmt: informace o posledním příkazu bloku
  */
-static bool is_value_stmt(const StmtInfo *s) {
-  return s->kind == SK_EXPR ||
-         (s->kind == SK_IF && s->type != EXPR_TYPE_UNKNOWN);
+static bool is_value_stmt(const StmtInfo *stmt) {
+  return stmt->kind == SK_EXPR ||
+         (stmt->kind == SK_IF && stmt->type != EXPR_TYPE_UNKNOWN);
 }
 
 /**
@@ -584,12 +594,14 @@ static bool is_value_stmt(const StmtInfo *s) {
  * @param base_indent: odsazení řádku s def (v bloku extension nenulové)
  */
 static bool body_ends_here(const ParserCtx *ctx, int base_indent) {
-  TokenType t = ctx->current_token.token_type;
-  if (t == T_EOF)
+  TokenType tok_type = ctx->current_token.token_type;
+  if (tok_type == T_EOF)
     return true;
   if (ctx->line_indent == 0)
-    return t == T_FUNC_MAIN || t == T_KW_DEF || t == T_EXTENSION;
-  return (base_indent > 0 && ctx->line_indent == base_indent && t == T_KW_DEF);
+    return tok_type == T_FUNC_MAIN || tok_type == T_KW_DEF ||
+           tok_type == T_EXTENSION;
+  return (base_indent > 0 && ctx->line_indent == base_indent &&
+          tok_type == T_KW_DEF);
 }
 
 /**
@@ -600,10 +612,10 @@ static bool body_ends_here(const ParserCtx *ctx, int base_indent) {
  * @param fentry: záznam funkce v tabulce symbolů
  */
 static int analyze_function(ParserCtx *ctx, const char *name,
-                            symtable_entry *fentry) {
+                            SymtableEntry *fentry) {
   int status = 0;
   const TokenType ret_type = fentry->type;
-  const f_param *params = fentry->f_params;
+  const FuncParam *params = fentry->f_params;
   const int param_count = fentry->f_param_count;
   fentry->body_state = BODY_IN_PROGRESS;
 
@@ -612,16 +624,16 @@ static int analyze_function(ParserCtx *ctx, const char *name,
   fnode->data.func_def.name = strdup(name);
   ASTNode *ph = NULL, *pt = NULL;
   for (int i = 0; i < param_count; i++) {
-    ASTNode *p = ast_create_node(AST_IDENTIFIER);
-    p->data.string_val = strdup(params[i].name);
-    p->expr_type = expr_from_kw(params[i].type);
-    list_append(&ph, &pt, p);
+    ASTNode *param = ast_create_node(AST_IDENTIFIER);
+    param->data.string_val = strdup(params[i].name);
+    param->expr_type = expr_from_kw(params[i].type);
+    list_append(&ph, &pt, param);
   }
   fnode->data.func_def.params = ph;
 
   smt_scope_add(&ctx->smt);
   for (int i = 0; i < param_count; i++) {
-    symtable_entry *pe = symtable_entry_init();
+    SymtableEntry *pe = symtable_entry_init();
     pe->type = params[i].type;
     pe->declared = true;
     pe->defined = true;
@@ -635,11 +647,11 @@ static int analyze_function(ParserCtx *ctx, const char *name,
     status =
         parse_block(ctx, fentry->def_indent, &info, &fnode->data.func_def.body);
     if (status == 0) {
-      TokenType t = ctx->current_token.token_type;
-      if (t == T_ERROR)
+      TokenType tok_type = ctx->current_token.token_type;
+      if (tok_type == T_ERROR)
         status = LEX_ANAL_ERR;
       else if (!body_ends_here(ctx, fentry->def_indent))
-        status = ERR_SYNTAX;
+        status = SYN_ANAL_ERR;
     }
     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
         !info.returns &&
@@ -659,16 +671,16 @@ static int analyze_function(ParserCtx *ctx, const char *name,
     }
   } else {
     ExprType body_type = EXPR_TYPE_UNKNOWN;
-    ASTNode *e = NULL;
-    status = parse_expression(ctx, &e, &body_type);
+    ASTNode *expr = NULL;
+    status = parse_expression(ctx, &expr, &body_type);
     if (status == 0) {
       fnode->data.func_def.body = ast_create_node(AST_BLOCK);
-      fnode->data.func_def.body->data.block.statements = e;
+      fnode->data.func_def.body->data.block.statements = expr;
     }
     if (status == 0 && ctx->current_token.token_type != T_EOL &&
         ctx->current_token.token_type != T_EOF)
       status = (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
-                                                          : ERR_SYNTAX;
+                                                          : SYN_ANAL_ERR;
     if (status == 0 && ret_type != T_ERROR && ret_type != T_KW_UNIT &&
         !types_compatible(ret_type, body_type))
       status = STATIC_SEM_TYPE_ERR;
@@ -693,15 +705,15 @@ static int analyze_function(ParserCtx *ctx, const char *name,
   return status;
 }
 
-int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry) {
+int resolve_function(ParserCtx *ctx, const char *name, SymtableEntry *fentry) {
   const SourceMark saved_mark = mark_get(ctx);
   const TokenType saved_ret = ctx->ret_type;
-  const symtable saved_smt = ctx->smt;
+  const Symtable saved_smt = ctx->smt;
 
-  symtable view;
+  Symtable view;
   view.size = saved_smt.size;
   view.top = 0;
-  view.table = malloc(sizeof(avl_tree *) * (size_t)view.size);
+  view.table = malloc(sizeof(AvlTree *) * (size_t)view.size);
   if (view.table == NULL)
     return COMPILER_ERR;
   view.table[0] = saved_smt.table[0];
@@ -725,10 +737,11 @@ int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry) {
  */
 static void skip_function_body(ParserCtx *ctx, int base_indent) {
   while (true) {
-    TokenType t = ctx->current_token.token_type;
-    if (t == T_EOF || t == T_ERROR)
+    TokenType tok_type = ctx->current_token.token_type;
+    if (tok_type == T_EOF || tok_type == T_ERROR)
       return;
-    if ((t == T_KW_DEF || t == T_FUNC_MAIN || t == T_EXTENSION) &&
+    if ((tok_type == T_KW_DEF || tok_type == T_FUNC_MAIN ||
+         tok_type == T_EXTENSION) &&
         ctx->line_indent <= base_indent)
       return;
     advance(ctx);
@@ -738,10 +751,10 @@ static void skip_function_body(ParserCtx *ctx, int base_indent) {
 /**
  * @brief Vrátí jméno typu příjemce rozšiřující metody
  *
- * @param t: token typu
+ * @param tok_type: token typu
  */
-static const char *ext_type_name(TokenType t) {
-  switch (t) {
+static const char *ext_type_name(TokenType tok_type) {
+  switch (tok_type) {
   case T_KW_INT:
     return "Int";
   case T_KW_DOUBLE:
@@ -761,77 +774,77 @@ static const char *ext_type_name(TokenType t) {
  * @brief Zpracuje hlavičku extension (jméno: Typ) (pravidlo 27)
  *
  * @param ctx: kontext parseru, aktuální token je extension
- * @param r: načtený příjemce, jméno je třeba uvolnit
+ * @param recv: načtený příjemce, jméno je třeba uvolnit
  */
-static int parse_extension_header(ParserCtx *ctx, ExtRecv *r) {
+static int parse_extension_header(ParserCtx *ctx, ExtRecv *recv) {
   int status;
-  f_param *ps = NULL;
+  FuncParam *ps = NULL;
   int cnt = 0;
-  r->name = NULL;
+  recv->name = NULL;
 
   advance(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   if ((status = parse_parameters(ctx, &ps, &cnt)) != 0) {
     free_params(ps, cnt);
     return status;
   }
   if (cnt != 1) {
     free_params(ps, cnt);
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   }
-  r->name = ps[0].name;
-  r->type = ps[0].type;
+  recv->name = ps[0].name;
+  recv->type = ps[0].type;
   free(ps);
 
   if (ctx->current_token.token_type != T_EOL) {
-    free(r->name);
-    r->name = NULL;
+    free(recv->name);
+    recv->name = NULL;
     return (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
-                                                      : ERR_SYNTAX;
+                                                      : SYN_ANAL_ERR;
   }
   while (ctx->current_token.token_type == T_EOL)
     advance(ctx);
   if (ctx->current_token.token_type != T_KW_DEF || ctx->line_indent == 0) {
-    free(r->name);
-    r->name = NULL;
+    free(recv->name);
+    recv->name = NULL;
     return (ctx->current_token.token_type == T_ERROR) ? LEX_ANAL_ERR
-                                                      : ERR_SYNTAX;
+                                                      : SYN_ANAL_ERR;
   }
-  r->indent = ctx->line_indent;
+  recv->indent = ctx->line_indent;
   return 0;
 }
 
 /**
  * @brief Převede rozšiřující metodu na běžnou funkci
  *
- * @param h: hlavička metody, upraví se jméno a parametry
- * @param r: příjemce z hlavičky extension
+ * @param header: hlavička metody, upraví se jméno a parametry
+ * @param recv: příjemce z hlavičky extension
  */
-static int apply_receiver(FuncHeader *h, const ExtRecv *r) {
-  for (int i = 0; i < h->param_count; i++) {
-    if (strcmp(h->params[i].name, r->name) == 0)
+static int apply_receiver(FuncHeader *header, const ExtRecv *recv) {
+  for (int i = 0; i < header->param_count; i++) {
+    if (strcmp(header->params[i].name, recv->name) == 0)
       return REDEF_FN_VAR_ERR;
   }
-  const char *tn = ext_type_name(r->type);
+  const char *tn = ext_type_name(recv->type);
   if (tn == NULL)
-    return ERR_SYNTAX;
-  size_t len = strlen(tn) + 1 + strlen(h->name) + 1;
+    return SYN_ANAL_ERR;
+  size_t len = strlen(tn) + 1 + strlen(header->name) + 1;
   char *mangled = malloc(len);
-  f_param *ps = malloc(sizeof(f_param) * (size_t)(h->param_count + 1));
+  FuncParam *ps = malloc(sizeof(FuncParam) * (size_t)(header->param_count + 1));
   if (mangled == NULL || ps == NULL) {
     free(mangled);
     free(ps);
     return COMPILER_ERR;
   }
-  snprintf(mangled, len, "%s$%s", tn, h->name);
-  ps[0].name = strdup(r->name);
-  ps[0].type = r->type;
-  for (int i = 0; i < h->param_count; i++)
-    ps[i + 1] = h->params[i];
-  free(h->params);
-  h->params = ps;
-  h->param_count++;
-  h->name = mangled;
+  snprintf(mangled, len, "%s$%s", tn, header->name);
+  ps[0].name = strdup(recv->name);
+  ps[0].type = recv->type;
+  for (int i = 0; i < header->param_count; i++)
+    ps[i + 1] = header->params[i];
+  free(header->params);
+  header->params = ps;
+  header->param_count++;
+  header->name = mangled;
   return 0;
 }
 
@@ -841,8 +854,8 @@ static int apply_receiver(FuncHeader *h, const ExtRecv *r) {
  * @param ctx: kontext parseru, aktuální token je extension
  */
 static int collect_extension(ParserCtx *ctx) {
-  ExtRecv r;
-  int status = parse_extension_header(ctx, &r);
+  ExtRecv recv;
+  int status = parse_extension_header(ctx, &recv);
   if (status != 0)
     return status;
 
@@ -850,26 +863,26 @@ static int collect_extension(ParserCtx *ctx) {
     while (ctx->current_token.token_type == T_EOL)
       advance(ctx);
     if (ctx->current_token.token_type != T_KW_DEF ||
-        ctx->line_indent != r.indent)
+        ctx->line_indent != recv.indent)
       break;
 
     const size_t def_pos = ctx->pos - 1;
-    FuncHeader h;
-    status = parse_function_header(ctx, &h);
+    FuncHeader header;
+    status = parse_function_header(ctx, &header);
     if (status == 0)
-      status = apply_receiver(&h, &r);
+      status = apply_receiver(&header, &recv);
     if (status != 0)
       break;
-    symtable_entry *existing = NULL;
-    if (smt_search_global(&ctx->smt, (char *)h.name, &existing)) {
-      free_params(h.params, h.param_count);
-      free(h.list_sizes);
+    SymtableEntry *existing = NULL;
+    if (smt_search_global(&ctx->smt, (char *)header.name, &existing)) {
+      free_params(header.params, header.param_count);
+      free(header.list_sizes);
       break;
     }
-    register_function(ctx, &h, def_pos);
-    skip_function_body(ctx, r.indent);
+    register_function(ctx, &header, def_pos);
+    skip_function_body(ctx, recv.indent);
   }
-  free(r.name);
+  free(recv.name);
   return status;
 }
 
@@ -883,15 +896,15 @@ static int collect_signatures(ParserCtx *ctx) {
   int result = 0;
 
   while (true) {
-    TokenType t = ctx->current_token.token_type;
-    if (t == T_EOL ||
-        (t == T_INDENTS && ctx->current_token.token_indents.count == 0)) {
+    TokenType tok_type = ctx->current_token.token_type;
+    if (tok_type == T_EOL || (tok_type == T_INDENTS &&
+                              ctx->current_token.token_indents.count == 0)) {
       advance(ctx);
       continue;
     }
-    if (t == T_EXTENSION && ctx->line_indent == 0) {
+    if (tok_type == T_EXTENSION && ctx->line_indent == 0) {
       int st = collect_extension(ctx);
-      if (st == LEX_ANAL_ERR || st == ERR_SYNTAX) {
+      if (st == LEX_ANAL_ERR || st == SYN_ANAL_ERR) {
         result = st;
         break;
       }
@@ -899,24 +912,25 @@ static int collect_signatures(ParserCtx *ctx) {
         break;
       continue;
     }
-    if ((t != T_KW_DEF && t != T_FUNC_MAIN) || ctx->line_indent != 0)
+    if ((tok_type != T_KW_DEF && tok_type != T_FUNC_MAIN) ||
+        ctx->line_indent != 0)
       break;
 
     const size_t def_pos = ctx->pos - 1;
-    FuncHeader h;
-    int status = parse_function_header(ctx, &h);
+    FuncHeader header;
+    int status = parse_function_header(ctx, &header);
     if (status != 0) {
-      if (status == LEX_ANAL_ERR || status == ERR_SYNTAX)
+      if (status == LEX_ANAL_ERR || status == SYN_ANAL_ERR)
         result = status;
       break;
     }
-    symtable_entry *existing = NULL;
-    if (smt_search_global(&ctx->smt, (char *)h.name, &existing)) {
-      free_params(h.params, h.param_count);
-      free(h.list_sizes);
+    SymtableEntry *existing = NULL;
+    if (smt_search_global(&ctx->smt, (char *)header.name, &existing)) {
+      free_params(header.params, header.param_count);
+      free(header.list_sizes);
       break;
     }
-    register_function(ctx, &h, def_pos);
+    register_function(ctx, &header, def_pos);
     skip_function_body(ctx, 0);
   }
 
@@ -934,37 +948,42 @@ static int parse_defsingle(ParserCtx *ctx, const ExtRecv *recv) {
   int status;
   const size_t def_pos = ctx->pos - 1;
 
-  FuncHeader h;
-  if ((status = parse_function_header(ctx, &h)) != 0)
+  FuncHeader header;
+  if ((status = parse_function_header(ctx, &header)) != 0)
     return status;
-  if (recv != NULL && (status = apply_receiver(&h, recv)) != 0)
+  if (recv != NULL && (status = apply_receiver(&header, recv)) != 0)
     return status;
 
-  if (h.is_main) {
-    if (h.param_count > 0)
-      return STATIC_SEM_ERR;
-    if (h.ret_type != T_KW_UNIT)
-      return STATIC_SEM_TYPE_ERR;
-    ctx->main_count++;
-    if (ctx->main_count > 1)
-      return REDEF_FN_VAR_ERR;
+  if (header.is_main) {
+    status = 0;
+    if (header.param_count > 0)
+      status = STATIC_SEM_ERR;
+    else if (header.ret_type != T_KW_UNIT)
+      status = STATIC_SEM_TYPE_ERR;
+    else if (++ctx->main_count > 1)
+      status = REDEF_FN_VAR_ERR;
+    if (status != 0) {
+      free_params(header.params, header.param_count);
+      free(header.list_sizes);
+      return status;
+    }
   }
 
-  symtable_entry *fentry = NULL;
-  if (smt_search_global(&ctx->smt, (char *)h.name, &fentry)) {
+  SymtableEntry *fentry = NULL;
+  if (smt_search_global(&ctx->smt, (char *)header.name, &fentry)) {
     if (fentry->body_state == BODY_NONE || fentry->def_pos != def_pos)
       return REDEF_FN_VAR_ERR;
-    free_params(h.params, h.param_count);
-    free(h.list_sizes);
+    free_params(header.params, header.param_count);
+    free(header.list_sizes);
     if (fentry->body_state == BODY_DONE) {
       mark_set(ctx, &fentry->body_end);
       return 0;
     }
   } else {
-    fentry = register_function(ctx, &h, def_pos);
+    fentry = register_function(ctx, &header, def_pos);
   }
 
-  return analyze_function(ctx, h.name, fentry);
+  return analyze_function(ctx, header.name, fentry);
 }
 
 /**
@@ -973,29 +992,29 @@ static int parse_defsingle(ParserCtx *ctx, const ExtRecv *recv) {
  * @param ctx: kontext parseru, aktuální token je extension
  */
 static int parse_extension(ParserCtx *ctx) {
-  ExtRecv r;
-  int status = parse_extension_header(ctx, &r);
+  ExtRecv recv;
+  int status = parse_extension_header(ctx, &recv);
   if (status != 0)
     return status;
 
   while (true) {
-    if ((status = parse_defsingle(ctx, &r)) != 0)
+    if ((status = parse_defsingle(ctx, &recv)) != 0)
       break;
     while (ctx->current_token.token_type == T_EOL)
       advance(ctx);
-    TokenType t = ctx->current_token.token_type;
-    if (t == T_ERROR) {
+    TokenType tok_type = ctx->current_token.token_type;
+    if (tok_type == T_ERROR) {
       status = LEX_ANAL_ERR;
       break;
     }
-    if (t == T_EOF || ctx->line_indent < r.indent)
+    if (tok_type == T_EOF || ctx->line_indent < recv.indent)
       break;
-    if (ctx->line_indent > r.indent || t != T_KW_DEF) {
-      status = ERR_SYNTAX;
+    if (ctx->line_indent > recv.indent || tok_type != T_KW_DEF) {
+      status = SYN_ANAL_ERR;
       break;
     }
   }
-  free(r.name);
+  free(recv.name);
   return status;
 }
 
@@ -1016,17 +1035,17 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent,
         (ctx->current_token.token_type == T_INDENTS &&
          ctx->current_token.token_indents.count == current_indent)) {
       advance(ctx);
-      TOKEN_CHEK(ctx->current_token);
+      TOKEN_CHECK(ctx->current_token);
       continue;
     }
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
 
     if (ctx->current_token.token_type == T_EOF)
       break;
     if (ctx->line_indent < current_indent)
       break;
     if (ctx->line_indent > current_indent)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
 
     if (ctx->current_token.token_type == T_KW_ELSE ||
         ctx->current_token.token_type == T_FUNC_MAIN ||
@@ -1055,12 +1074,12 @@ static int parse_statement_list(ParserCtx *ctx, int current_indent,
  * @param info: informace o příkazu
  */
 static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
-  ExprType t = EXPR_TYPE_UNKNOWN;
+  ExprType expr_type = EXPR_TYPE_UNKNOWN;
   ASTNode *ast = NULL;
-  int status = parse_expression(ctx, &ast, &t);
+  int status = parse_expression(ctx, &ast, &expr_type);
   if (status == 0) {
     info->kind = SK_EXPR;
-    info->type = t;
+    info->type = expr_type;
     info->node = ast;
   }
   return status;
@@ -1075,16 +1094,16 @@ static int parse_expr_statement(ParserCtx *ctx, StmtInfo *info) {
 static int end_of_simple_statement(ParserCtx *ctx, int status) {
   if (status != 0)
     return status;
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   if (ctx->current_token.token_type == T_SEMICOLON) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     return 0;
   }
   if (ctx->current_token.token_type != T_EOL &&
       ctx->current_token.token_type != T_EOF &&
       ctx->current_token.token_type != T_KW_ELSE)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   return 0;
 }
 
@@ -1123,17 +1142,17 @@ static int parse_statement(ParserCtx *ctx, int current_indent, StmtInfo *info) {
   case T_OPEN_BRACKET:
     return end_of_simple_statement(ctx, parse_expr_statement(ctx, info));
   default:
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   }
 }
 
 /**
  * @brief Převede typ výrazu na typ jako token klíčového slova
  *
- * @param t: typ výrazu
+ * @param expr_type: typ výrazu
  */
-static TokenType kw_from_expr_type(ExprType t) {
-  switch (t) {
+static TokenType kw_from_expr_type(ExprType expr_type) {
+  switch (expr_type) {
   case EXPR_TYPE_INT:
     return T_KW_INT;
   case EXPR_TYPE_DOUBLE:
@@ -1185,18 +1204,18 @@ static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
   int status;
   if ((status = match(ctx, T_KW_VAL)) != 0)
     return status;
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   if (ctx->current_token.token_type != T_IDENTIFICATOR)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   const char *name = ctx->current_token.token_lexeme.lexeme;
   advance(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
 
   TokenType declared = T_ERROR;
   bool has_type = false;
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     if ((status = parse_type(ctx, &declared)) != 0)
       return status;
     has_type = true;
@@ -1219,18 +1238,18 @@ static int parse_valdef(ParserCtx *ctx, StmtInfo *info) {
     var_type = kw_from_expr_type(expr_type);
   }
 
-  symtable_entry *entry = symtable_entry_init();
+  SymtableEntry *entry = symtable_entry_init();
   entry->type = var_type;
   entry->declared = true;
   entry->defined = true;
   entry->value = true;
   smt_insert(&ctx->smt, (char *)name, entry);
 
-  ASTNode *n = ast_create_node(AST_VAR_DECL);
-  n->data.var_assign.identifier = strdup(name);
-  n->data.var_assign.expression = init;
-  n->expr_type = expr_from_kw(var_type);
-  info->node = n;
+  ASTNode *node = ast_create_node(AST_VAR_DECL);
+  node->data.var_assign.identifier = strdup(name);
+  node->data.var_assign.expression = init;
+  node->expr_type = expr_from_kw(var_type);
+  info->node = node;
 
   return 0;
 }
@@ -1246,16 +1265,16 @@ static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
   if ((status = match(ctx, T_KW_VAR)) != 0)
     return status;
   if (ctx->current_token.token_type != T_IDENTIFICATOR)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   const char *name = ctx->current_token.token_lexeme.lexeme;
   advance(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
 
   TokenType declared = T_ERROR;
   bool has_type = false;
   if (ctx->current_token.token_type == T_DOUBLE_DOT) {
     advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     if ((status = parse_type(ctx, &declared)) != 0)
       return status;
     has_type = true;
@@ -1278,18 +1297,18 @@ static int parse_vardef(ParserCtx *ctx, StmtInfo *info) {
     var_type = kw_from_expr_type(expr_type);
   }
 
-  symtable_entry *entry = symtable_entry_init();
+  SymtableEntry *entry = symtable_entry_init();
   entry->type = var_type;
   entry->declared = true;
   entry->defined = true;
   entry->variable = true;
   smt_insert(&ctx->smt, (char *)name, entry);
 
-  ASTNode *n = ast_create_node(AST_VAR_DECL);
-  n->data.var_assign.identifier = strdup(name);
-  n->data.var_assign.expression = init;
-  n->expr_type = expr_from_kw(var_type);
-  info->node = n;
+  ASTNode *node = ast_create_node(AST_VAR_DECL);
+  node->data.var_assign.identifier = strdup(name);
+  node->data.var_assign.expression = init;
+  node->expr_type = expr_from_kw(var_type);
+  info->node = node;
 
   return 0;
 }
@@ -1305,7 +1324,7 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
 
   const char *name = ctx->current_token.token_lexeme.lexeme;
   char *id = strdup(name);
-  symtable_entry *entry = NULL;
+  SymtableEntry *entry = NULL;
   if (!smt_search(&ctx->smt, (char *)name, &entry)) {
     free(id);
     return UNDEF_FN_ERR;
@@ -1336,11 +1355,11 @@ static int parse_assignment(ParserCtx *ctx, StmtInfo *info) {
     return STATIC_SEM_TYPE_ERR;
   }
 
-  ASTNode *n = ast_create_node(AST_ASSIGNMENT);
-  n->data.var_assign.identifier = id;
-  n->data.var_assign.expression = rhs;
-  n->expr_type = expr_from_kw(entry->type);
-  info->node = n;
+  ASTNode *node = ast_create_node(AST_ASSIGNMENT);
+  node->data.var_assign.identifier = id;
+  node->data.var_assign.expression = rhs;
+  node->expr_type = expr_from_kw(entry->type);
+  info->node = node;
 
   return 0;
 }
@@ -1363,7 +1382,7 @@ static int parse_return_statement(ParserCtx *ctx, StmtInfo *info) {
   info->node = rn;
 
   TokenType next = ctx->current_token.token_type;
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   if (next == T_EOL || next == T_EOF || next == T_SEMICOLON) {
     if (ctx->ret_type != T_ERROR && ctx->ret_type != T_KW_UNIT)
       return STATIC_SEM_TYPE_ERR;
@@ -1397,7 +1416,7 @@ static int parse_condition(ParserCtx *ctx, TokenType terminator,
   if (status != 0)
     return status;
   if (ctx->current_token.token_type != terminator)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   if (type != EXPR_TYPE_BOOL && type != EXPR_TYPE_UNKNOWN)
     return STATIC_SEM_TYPE_ERR;
   return 0;
@@ -1406,29 +1425,30 @@ static int parse_condition(ParserCtx *ctx, TokenType terminator,
 /**
  * @brief Zjistí, zda větev if dává hodnotu, a jakého typu
  *
- * @param b: informace o posledním příkazu větve
+ * @param branch: informace o posledním příkazu větve
  * @param as_expr: true pro if jako výraz
- * @param t: typ hodnoty větve
+ * @param expr_type: typ hodnoty větve
  */
-static bool branch_value(const StmtInfo *b, bool as_expr, ExprType *t) {
-  switch (b->kind) {
+static bool branch_value(const StmtInfo *branch, bool as_expr,
+                         ExprType *expr_type) {
+  switch (branch->kind) {
   case SK_EXPR:
-    *t = b->type;
+    *expr_type = branch->type;
     return true;
   case SK_IF:
-    if (b->type != EXPR_TYPE_UNKNOWN) {
-      *t = b->type;
+    if (branch->type != EXPR_TYPE_UNKNOWN) {
+      *expr_type = branch->type;
       return true;
     }
-    if (as_expr && !b->returns) {
-      *t = EXPR_TYPE_UNIT;
+    if (as_expr && !branch->returns) {
+      *expr_type = EXPR_TYPE_UNIT;
       return true;
     }
     return false;
   case SK_OTHER:
     if (!as_expr)
       return false;
-    *t = EXPR_TYPE_UNIT;
+    *expr_type = EXPR_TYPE_UNIT;
     return true;
   default:
     return false;
@@ -1438,21 +1458,21 @@ static bool branch_value(const StmtInfo *b, bool as_expr, ExprType *t) {
 /**
  * @brief Sjednotí typy dvou větví if
  *
- * @param a: typ větve then
- * @param b: typ větve else
+ * @param then_type: typ větve then
+ * @param else_type: typ větve else
  * @param out: společný typ
  */
-static bool unify_types(ExprType a, ExprType b, ExprType *out) {
-  if (a == b || b == EXPR_TYPE_UNKNOWN) {
-    *out = a;
+static bool unify_types(ExprType then_type, ExprType else_type, ExprType *out) {
+  if (then_type == else_type || else_type == EXPR_TYPE_UNKNOWN) {
+    *out = then_type;
     return true;
   }
-  if (a == EXPR_TYPE_UNKNOWN) {
-    *out = b;
+  if (then_type == EXPR_TYPE_UNKNOWN) {
+    *out = else_type;
     return true;
   }
-  if ((a == EXPR_TYPE_INT && b == EXPR_TYPE_DOUBLE) ||
-      (a == EXPR_TYPE_DOUBLE && b == EXPR_TYPE_INT)) {
+  if ((then_type == EXPR_TYPE_INT && else_type == EXPR_TYPE_DOUBLE) ||
+      (then_type == EXPR_TYPE_DOUBLE && else_type == EXPR_TYPE_INT)) {
     *out = EXPR_TYPE_DOUBLE;
     return true;
   }
@@ -1473,16 +1493,16 @@ static int parse_branch(ParserCtx *ctx, int current_indent, StmtInfo *out,
   if (!as_expr || ctx->current_token.token_type == T_EOL)
     return parse_body(ctx, current_indent, out, blk);
 
-  ExprType t = EXPR_TYPE_UNKNOWN;
-  ASTNode *e = NULL;
-  int status = parse_expression(ctx, &e, &t);
+  ExprType expr_type = EXPR_TYPE_UNKNOWN;
+  ASTNode *expr = NULL;
+  int status = parse_expression(ctx, &expr, &expr_type);
   if (status != 0)
     return status;
   *blk = ast_create_node(AST_BLOCK);
-  (*blk)->data.block.statements = e;
+  (*blk)->data.block.statements = expr;
   out->kind = SK_EXPR;
-  out->type = t;
-  out->node = e;
+  out->type = expr_type;
+  out->node = expr;
   return 0;
 }
 
@@ -1503,12 +1523,12 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
   if ((status = match(ctx, T_KW_IF)) != 0)
     return status;
 
-  ASTNode *n = ast_create_node(AST_IF);
-  n->data.if_stmt.else_body = NULL;
-  n->expr_type = EXPR_TYPE_UNKNOWN;
+  ASTNode *node = ast_create_node(AST_IF);
+  node->data.if_stmt.else_body = NULL;
+  node->expr_type = EXPR_TYPE_UNKNOWN;
 
-  if ((status = parse_condition(ctx, T_KW_THEN, &n->data.if_stmt.condition)) !=
-      0)
+  if ((status =
+           parse_condition(ctx, T_KW_THEN, &node->data.if_stmt.condition)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_THEN)) != 0)
@@ -1516,7 +1536,7 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
 
   bool inline_then = ctx->current_token.token_type != T_EOL;
   if ((status = parse_branch(ctx, current_indent, &then_info,
-                             &n->data.if_stmt.body, as_expr)) != 0)
+                             &node->data.if_stmt.body, as_expr)) != 0)
     return status;
 
   bool has_else = inline_then && ctx->current_token.token_type == T_KW_ELSE;
@@ -1533,15 +1553,15 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
       if ((status =
                parse_if_common(ctx, current_indent, &else_info, as_expr)) != 0)
         return status;
-      n->data.if_stmt.else_body = ast_create_node(AST_BLOCK);
-      n->data.if_stmt.else_body->data.block.statements = else_info.node;
+      node->data.if_stmt.else_body = ast_create_node(AST_BLOCK);
+      node->data.if_stmt.else_body->data.block.statements = else_info.node;
     } else if ((status = parse_branch(ctx, current_indent, &else_info,
-                                      &n->data.if_stmt.else_body, as_expr)) !=
-               0) {
+                                      &node->data.if_stmt.else_body,
+                                      as_expr)) != 0) {
       return status;
     }
   } else if (as_expr) {
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   }
 
   ExprType tt = EXPR_TYPE_UNKNOWN, et = EXPR_TYPE_UNKNOWN;
@@ -1563,11 +1583,11 @@ static int parse_if_common(ParserCtx *ctx, int current_indent, StmtInfo *info,
     }
   }
 
-  n->expr_type = value ? rt : EXPR_TYPE_UNKNOWN;
+  node->expr_type = value ? rt : EXPR_TYPE_UNKNOWN;
   info->kind = SK_IF;
-  info->type = n->expr_type;
+  info->type = node->expr_type;
   info->returns = then_info.returns && has_else && else_info.returns;
-  info->node = n;
+  info->node = node;
   return 0;
 }
 
@@ -1597,11 +1617,12 @@ static void rewind_to_eol(ParserCtx *ctx) {
   size_t first = 0;
   bool found = false;
   while (i > 0) {
-    TokenType t = ctx->tokens[i - 1].token_type;
-    if (t == T_EOL) {
+    TokenType tok_type = ctx->tokens[i - 1].token_type;
+    if (tok_type == T_EOL) {
       first = i - 1;
       found = true;
-    } else if (t != T_INDENTS && t != T_WHITESPACE_SEP && t != T_TAB) {
+    } else if (tok_type != T_INDENTS && tok_type != T_WHITESPACE_SEP &&
+               tok_type != T_TAB) {
       break;
     }
     i--;
@@ -1638,18 +1659,18 @@ static int parse_while_statement(ParserCtx *ctx, int current_indent,
   if ((status = match(ctx, T_KW_WHILE)) != 0)
     return status;
 
-  ASTNode *n = ast_create_node(AST_WHILE);
+  ASTNode *node = ast_create_node(AST_WHILE);
 
-  if ((status = parse_condition(ctx, T_KW_DO, &n->data.while_loop.condition)) !=
-      0)
+  if ((status = parse_condition(ctx, T_KW_DO,
+                                &node->data.while_loop.condition)) != 0)
     return status;
 
   if ((status = match(ctx, T_KW_DO)) != 0)
     return status;
 
-  status = parse_body(ctx, current_indent, NULL, &n->data.while_loop.body);
+  status = parse_body(ctx, current_indent, NULL, &node->data.while_loop.body);
   if (status == 0)
-    info->node = n;
+    info->node = node;
   return status;
 }
 
@@ -1667,15 +1688,15 @@ static int parse_block(ParserCtx *ctx, int expected_indent, StmtInfo *out,
 
   if ((status = match(ctx, T_EOL)) != 0)
     return status;
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
   if (ctx->current_token.token_type == T_TAB) {
     return LEX_ANAL_ERR;
   }
   if (ctx->current_token.token_type != T_INDENTS)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
 
   if (ctx->current_token.token_indents.count <= expected_indent)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
 
   int block_indent = ctx->current_token.token_indents.count;
   advance(ctx);
@@ -1718,8 +1739,6 @@ static int parse_body(ParserCtx *ctx, int current_indent, StmtInfo *out,
   return 0;
 }
 
-static int for_counter = 0;
-
 /**
  * @brief Ověří, zda je aktuální token identifikátor s daným lexémem
  *
@@ -1737,35 +1756,36 @@ static bool is_word(const ParserCtx *ctx, const char *word) {
  * @param name: jméno proměnné
  */
 static ASTNode *int_ident(const char *name) {
-  ASTNode *n = ast_create_node(AST_IDENTIFIER);
-  n->data.string_val = strdup(name);
-  n->expr_type = EXPR_TYPE_INT;
-  return n;
+  ASTNode *node = ast_create_node(AST_IDENTIFIER);
+  node->data.string_val = strdup(name);
+  node->expr_type = EXPR_TYPE_INT;
+  return node;
 }
 
 /**
  * @brief Vytvoří uzel binární operace s daným typem výsledku
  *
  * @param op: operátor
- * @param l: levý operand
- * @param r: pravý operand
- * @param t: typ výsledku
+ * @param left: levý operand
+ * @param right: pravý operand
+ * @param expr_type: typ výsledku
  */
-static ASTNode *int_binop(int op, ASTNode *l, ASTNode *r, ExprType t) {
-  ASTNode *n = ast_make_binop(op, l, r);
-  n->expr_type = t;
-  return n;
+static ASTNode *int_binop(int op, ASTNode *left, ASTNode *right,
+                          ExprType expr_type) {
+  ASTNode *node = ast_make_binop(op, left, right);
+  node->expr_type = expr_type;
+  return node;
 }
 
 /**
  * @brief Vytvoří celočíselný literál
  *
- * @param v: hodnota
+ * @param value: hodnota
  */
-static ASTNode *int_literal(int v) {
-  ASTNode *n = ast_make_int(v);
-  n->expr_type = EXPR_TYPE_INT;
-  return n;
+static ASTNode *int_literal(int value) {
+  ASTNode *node = ast_make_int(value);
+  node->expr_type = EXPR_TYPE_INT;
+  return node;
 }
 
 /**
@@ -1773,14 +1793,14 @@ static ASTNode *int_literal(int v) {
  *
  * @param type: AST_VAR_DECL, nebo AST_ASSIGNMENT
  * @param name: jméno proměnné
- * @param e: přiřazovaný výraz
+ * @param expr: přiřazovaný výraz
  */
-static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *e) {
-  ASTNode *n = ast_create_node(type);
-  n->data.var_assign.identifier = strdup(name);
-  n->data.var_assign.expression = e;
-  n->expr_type = EXPR_TYPE_INT;
-  return n;
+static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *expr) {
+  ASTNode *node = ast_create_node(type);
+  node->data.var_assign.identifier = strdup(name);
+  node->data.var_assign.expression = expr;
+  node->expr_type = EXPR_TYPE_INT;
+  return node;
 }
 
 /**
@@ -1789,9 +1809,9 @@ static ASTNode *int_store(ASTNodeType type, const char *name, ASTNode *e) {
  * @param statements: první příkaz seznamu
  */
 static ASTNode *block_of(ASTNode *statements) {
-  ASTNode *b = ast_create_node(AST_BLOCK);
-  b->data.block.statements = statements;
-  return b;
+  ASTNode *block = ast_create_node(AST_BLOCK);
+  block->data.block.statements = statements;
+  return block;
 }
 
 /**
@@ -1799,12 +1819,12 @@ static ASTNode *block_of(ASTNode *statements) {
  *
  * @param ctx: kontext parseru
  * @param want: požadovaný typ výrazu
- * @param e: uzel AST výrazu
+ * @param expr: uzel AST výrazu
  */
-static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **e) {
-  ExprType t = EXPR_TYPE_UNKNOWN;
-  int status = parse_expression(ctx, e, &t);
-  if (status == 0 && t != want && t != EXPR_TYPE_UNKNOWN)
+static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **expr) {
+  ExprType expr_type = EXPR_TYPE_UNKNOWN;
+  int status = parse_expression(ctx, expr, &expr_type);
+  if (status == 0 && expr_type != want && expr_type != EXPR_TYPE_UNKNOWN)
     return STATIC_SEM_TYPE_ERR;
   return status;
 }
@@ -1812,12 +1832,12 @@ static int parse_typed_expr(ParserCtx *ctx, ExprType want, ASTNode **e) {
 /**
  * @brief Vrátí operand výrazu bez unárních operátorů
  *
- * @param e: výraz
+ * @param expr: výraz
  */
-static ASTNode *strip_unary(ASTNode *e) {
-  while (e->type == AST_UNARY_OP)
-    e = e->data.unary_op.operand;
-  return e;
+static ASTNode *strip_unary(ASTNode *expr) {
+  while (expr->type == AST_UNARY_OP)
+    expr = expr->data.unary_op.operand;
+  return expr;
 }
 
 /**
@@ -1831,21 +1851,21 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
                                StmtInfo *info) {
   int status;
   advance(ctx);
-  TOKEN_CHEK(ctx->current_token);
+  TOKEN_CHECK(ctx->current_token);
 
   bool multiline = ctx->current_token.token_type == T_EOL;
   int gen_indent = current_indent;
   if (multiline) {
     while (ctx->current_token.token_type == T_EOL)
       advance(ctx);
-    TOKEN_CHEK(ctx->current_token);
+    TOKEN_CHECK(ctx->current_token);
     if (ctx->line_indent <= current_indent)
-      return ERR_SYNTAX;
+      return SYN_ANAL_ERR;
     gen_indent = ctx->line_indent;
   }
 
   if (ctx->current_token.token_type != T_IDENTIFICATOR)
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   const char *var = ctx->current_token.token_lexeme.lexeme;
   advance(ctx);
   if ((status = match(ctx, T_LT)) != 0 ||
@@ -1857,7 +1877,7 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
     return status;
   bool inclusive = is_word(ctx, "to");
   if (!inclusive && !is_word(ctx, "until"))
-    return ERR_SYNTAX;
+    return SYN_ANAL_ERR;
   advance(ctx);
   if ((status = parse_typed_expr(ctx, EXPR_TYPE_INT, &to)) != 0)
     return status;
@@ -1871,7 +1891,7 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
   }
 
   smt_scope_add(&ctx->smt);
-  symtable_entry *ve = symtable_entry_init();
+  SymtableEntry *ve = symtable_entry_init();
   ve->type = T_KW_INT;
   ve->declared = true;
   ve->defined = true;
@@ -1883,7 +1903,7 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
   while (status == 0) {
     if (multiline) {
       if (ctx->current_token.token_type != T_EOL) {
-        status = ERR_SYNTAX;
+        status = SYN_ANAL_ERR;
         break;
       }
       while (ctx->current_token.token_type == T_EOL)
@@ -1893,27 +1913,27 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
         break;
       if (ctx->current_token.token_type != T_KW_IF ||
           ctx->line_indent != gen_indent) {
-        status = ERR_SYNTAX;
+        status = SYN_ANAL_ERR;
         break;
       }
     } else if (ctx->current_token.token_type == T_KW_DO) {
       break;
     } else if (ctx->current_token.token_type != T_KW_IF) {
-      status = ERR_SYNTAX;
+      status = SYN_ANAL_ERR;
       break;
     }
     advance(ctx);
-    ASTNode *g = NULL;
-    if ((status = parse_typed_expr(ctx, EXPR_TYPE_BOOL, &g)) != 0)
+    ASTNode *guard = NULL;
+    if ((status = parse_typed_expr(ctx, EXPR_TYPE_BOOL, &guard)) != 0)
       break;
-    ASTNode **tmp =
+    ASTNode **resized =
         realloc(guards, sizeof(*guards) * (size_t)(guard_count + 1));
-    if (tmp == NULL) {
+    if (resized == NULL) {
       status = COMPILER_ERR;
       break;
     }
-    guards = tmp;
-    guards[guard_count++] = g;
+    guards = resized;
+    guards[guard_count++] = guard;
   }
 
   ASTNode *body = NULL;
@@ -1928,7 +1948,7 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
   }
 
   char n_i[32], n_end[32], n_step[32];
-  int id = for_counter++;
+  int id = ctx->for_count++;
   snprintf(n_i, sizeof n_i, "$for%d_i", id);
   snprintf(n_end, sizeof n_end, "$for%d_end", id);
   snprintf(n_step, sizeof n_step, "$for%d_step", id);
@@ -1943,6 +1963,7 @@ static int parse_for_statement(ParserCtx *ctx, int current_indent,
       int_binop(T_PLUS_SIGN, int_ident(n_i), int_ident(n_step), EXPR_TYPE_INT));
   ASTNode *loop_var = int_store(AST_VAR_DECL, var, int_ident(n_i));
   loop_var->next = core->data.block.statements;
+  free(core);
   ASTNode *last = loop_var;
   while (last->next)
     last = last->next;
