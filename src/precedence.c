@@ -541,16 +541,11 @@ static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
       return SYN_ANAL_ERR;
     if (t != EXPR_TYPE_UNKNOWN && !is_numeric(t))
       return STATIC_SEM_TYPE_ERR;
-    // ja upraveno
     ASTNode *u = ast_make_unary(T_MINUS_SIGN, n);
     if (u)
       u->expr_type = t;
     if (!tstack_push(ts, t) || !ast_stack_push(as, u))
       return COMPILER_ERR;
-    /*
-    if (!tstack_push(ts, t) ||
-        !ast_stack_push(as, ast_make_unary(T_MINUS_SIGN, n)))
-      return COMPILER_ERR;*/
   }
   return SUCCESS;
 }
@@ -597,7 +592,8 @@ static ExprType int_or_double(ExprType l, ExprType r) {
  * @return SUCCESS; SYN_ANAL_ERR, chybí-li operand; STATIC_SEM_TYPE_ERR při
  *   nesprávných typech; COMPILER_ERR při selhání vložení.
  */
-Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
+static Error apply_operator(TokenType op, TypeStack *tstack,
+                            ASTStack *ast_stack) {
   ExprType right_type = EXPR_TYPE_UNKNOWN, left_type = EXPR_TYPE_UNKNOWN;
   ASTNode *right_node, *left_node;
   DEBUG_LOG("[DEBUG] apply_operator called for operator token %d\n", op);
@@ -688,7 +684,6 @@ Error apply_operator(TokenType op, TypeStack *tstack, ASTStack *ast_stack) {
   }
 
   ASTNode *binop_node = ast_make_binop(op, left_node, right_node);
-  // ja pridano radek 438
   if (!ast_stack_push(ast_stack, binop_node)) {
     return COMPILER_ERR;
   }
@@ -815,7 +810,7 @@ static Error finish_call(ParserCtx *parser, const char *name,
                          symtable_entry *fn, ASTNode *recv, ExprType *out_type,
                          ASTNode **out_node) {
   Error deferred = SUCCESS;
-  ASTNode *head = recv, *tail = recv; // ja
+  ASTNode *head = recv, *tail = recv;
   int lists = 0;
   int offset = recv ? 1 : 0;
 
@@ -832,7 +827,6 @@ static Error finish_call(ParserCtx *parser, const char *name,
     } else {
       while (true) {
         ExprType at = EXPR_TYPE_UNKNOWN;
-        // ja
         ASTNode *arg = NULL;
         Error err = parse_expression(parser, &arg, &at);
         if (err != SUCCESS)
@@ -904,7 +898,6 @@ static Error finish_call(ParserCtx *parser, const char *name,
   *out_node = node;
   return SUCCESS;
 }
-// ja
 
 /**
  * @brief Vytvoří kopii řetězce bez podtržítek.
@@ -1201,7 +1194,7 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
       if (leaf)
-        leaf->expr_type = t; // ja
+        leaf->expr_type = t;
       if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }
@@ -1265,7 +1258,7 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
           ExprType t = EXPR_TYPE_UNIT;
           ASTNode *unit_node = ast_create_node(AST_LITERAL_UNIT);
 
-          unit_node->expr_type = EXPR_TYPE_UNIT; // ja
+          unit_node->expr_type = EXPR_TYPE_UNIT;
 
           if (!tstack_push(&tstack, t) ||
               !ast_stack_push(&ast_stack, unit_node)) {
