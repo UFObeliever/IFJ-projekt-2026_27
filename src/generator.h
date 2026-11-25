@@ -1,14 +1,14 @@
 /**
-- @file generator.h
+ * @file generator.h
  *
-- Překladač jazyka IFJ26
+ * Překladač jazyka IFJ26
  *
-- @brief Rozhraní generátoru kódu.
+ * @brief Rozhraní generátoru kódu.
  *
-- Obsahuje funkce pro generování cílového kódu IFJcode26 z abstraktního
-- syntaktického stromu (AST).
+ * Obsahuje funkce pro generování cílového kódu IFJcode26 z abstraktního
+ * syntaktického stromu (AST).
  *
-- @author Klára Vantuchová (xvantuk00)
+ * @author Klára Vantuchová (xvantuk00)
  */
 #ifndef GENERATOR_H
 #define GENERATOR_H

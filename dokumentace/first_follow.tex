@@ -1,0 +1,37 @@
+% Vygenerováno skriptem gen_tabulky.py, needitujte ručně.
+{\small\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{@{}l p{5.8cm} p{5.8cm}@{}}
+\toprule Neterminál & FIRST & FOLLOW \\ \midrule \endhead
+\nt{program} & \textit{EOL}, \texttt{import} & \textit{EOF} \\
+\nt{eols} & \textit{EOL}, $\varepsilon$ & \texttt{def}, \texttt{import} \\
+\nt{fun\_list} & \texttt{@main}, \textit{EOL}, \texttt{def}, \texttt{extension}, $\varepsilon$ & \textit{EOF} \\
+\nt{fun\_def} & \texttt{@main}, \texttt{def} & \texttt{@main}, \textit{EOL}, \texttt{def}, \texttt{extension}, \textit{EOF} \\
+\nt{def\_head} & \texttt{def} & \texttt{@main}, \textit{DEDENT}, \textit{EOL}, \texttt{def}, \texttt{extension}, \textit{EOF} \\
+\nt{param\_lists} & \texttt{(}, $\varepsilon$ & \texttt{:}, \texttt{=} \\
+\nt{params} & \textit{id}, $\varepsilon$ & \texttt{)} \\
+\nt{params\_n} & \texttt{,}, $\varepsilon$ & \texttt{)} \\
+\nt{param} & \textit{id} & \texttt{)}, \texttt{,} \\
+\nt{ret\_type} & \texttt{:}, $\varepsilon$ & \texttt{=} \\
+\nt{type} & \texttt{Boolean}, \texttt{Double}, \texttt{Int}, \texttt{String}, \texttt{Unit} & \texttt{)}, \texttt{,}, \texttt{=} \\
+\nt{fun\_body} & \texttt{!}, \texttt{(}, \texttt{-}, \textit{EOL}, \texttt{false}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{true} & \texttt{@main}, \textit{DEDENT}, \textit{EOL}, \texttt{def}, \texttt{extension}, \textit{EOF} \\
+\nt{ext\_head} & \texttt{extension} & \texttt{@main}, \textit{EOL}, \texttt{def}, \texttt{extension}, \textit{EOF} \\
+\nt{ext\_defs} & \textit{EOL}, \texttt{def}, $\varepsilon$ & \textit{DEDENT} \\
+\nt{block} & \textit{EOL} & \texttt{;}, \texttt{@main}, \textit{DEDENT}, \textit{EOL}, \texttt{def}, \texttt{else}, \texttt{extension}, \textit{EOF} \\
+\nt{stmt\_list} & \texttt{;}, \textit{EOL}, $\varepsilon$ & \textit{DEDENT} \\
+\nt{stmt\_rest} & \texttt{!}, \texttt{(}, \texttt{-}, \textit{EOL}, \texttt{false}, \texttt{for}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{return}, \texttt{true}, \texttt{val}, \texttt{var}, \texttt{while}, $\varepsilon$ & \textit{DEDENT} \\
+\nt{stmt} & \texttt{!}, \texttt{(}, \texttt{-}, \texttt{false}, \texttt{for}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{return}, \texttt{true}, \texttt{val}, \texttt{var}, \texttt{while} & \texttt{;}, \textit{DEDENT}, \textit{EOL}, \texttt{else} \\
+\nt{opt\_type} & \texttt{:}, $\varepsilon$ & \texttt{=} \\
+\nt{ret\_val} & \texttt{!}, \texttt{(}, \texttt{-}, \texttt{false}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{true}, $\varepsilon$ & \texttt{;}, \textit{DEDENT}, \textit{EOL}, \texttt{else} \\
+\nt{else\_part} & \textit{EOL}, \texttt{else}, $\varepsilon$ & \texttt{;}, \textit{DEDENT}, \textit{EOL}, \texttt{else} \\
+\nt{body} & \texttt{!}, \texttt{(}, \texttt{-}, \textit{EOL}, \texttt{false}, \texttt{for}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{return}, \texttt{true}, \texttt{val}, \texttt{var}, \texttt{while} & \texttt{;}, \textit{DEDENT}, \textit{EOL}, \texttt{else} \\
+\nt{for\_head} & \textit{EOL}, \textit{id} & \texttt{do} \\
+\nt{generator} & \textit{id} & \textit{DEDENT}, \textit{EOL}, \texttt{by}, \texttt{do}, \texttt{if} \\
+\nt{range} & \texttt{to}, \texttt{until} & \texttt{!}, \texttt{(}, \texttt{-}, \texttt{false}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{true} \\
+\nt{step} & \texttt{by}, $\varepsilon$ & \textit{DEDENT}, \textit{EOL}, \texttt{do}, \texttt{if} \\
+\nt{guards} & \texttt{if}, $\varepsilon$ & \texttt{do} \\
+\nt{guards\_ml} & \textit{EOL}, $\varepsilon$ & \textit{DEDENT} \\
+\nt{if\_expr} & \texttt{if} & -- \\
+\nt{else\_e} & \textit{EOL}, \texttt{else} & -- \\
+\nt{branch} & \texttt{!}, \texttt{(}, \texttt{-}, \textit{EOL}, \texttt{false}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{true} & \textit{EOL}, \texttt{else} \\
+\nt{expr} & \texttt{!}, \texttt{(}, \texttt{-}, \texttt{false}, \textit{id}, \texttt{if}, \textit{literal}, \texttt{true} & \texttt{;}, \texttt{@main}, \textit{DEDENT}, \textit{EOL}, \texttt{by}, \texttt{def}, \texttt{do}, \texttt{else}, \texttt{extension}, \texttt{if}, \texttt{then}, \texttt{to}, \texttt{until}, \textit{EOF} \\
+\bottomrule\end{longtable}}

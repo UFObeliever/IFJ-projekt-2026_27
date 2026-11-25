@@ -1,0 +1,74 @@
+% Vygenerováno skriptem gen_tabulky.py, needitujte ručně.
+{\renewcommand{\arraystretch}{1.12}\small
+\begin{longtable}{@{}r@{\hspace{8pt}}r@{\hspace{5pt}}c@{\hspace{5pt}}l@{}}
+1. & \nt{program} & $\longrightarrow$ & \nt{eols} \texttt{import} \texttt{ifj26} \texttt{.} \texttt{*} \nt{fun\_list} \\
+2. & \nt{eols} & $\longrightarrow$ & \textit{EOL} \nt{eols} \\
+3. & \nt{eols} & $\longrightarrow$ & $\varepsilon$ \\
+4. & \nt{fun\_list} & $\longrightarrow$ & \nt{fun\_def} \nt{fun\_list} \\
+5. & \nt{fun\_list} & $\longrightarrow$ & \nt{ext\_head} \nt{fun\_list} \\
+6. & \nt{fun\_list} & $\longrightarrow$ & \textit{EOL} \nt{fun\_list} \\
+7. & \nt{fun\_list} & $\longrightarrow$ & $\varepsilon$ \\
+8. & \nt{fun\_def} & $\longrightarrow$ & \texttt{@main} \nt{eols} \nt{def\_head} \\
+9. & \nt{fun\_def} & $\longrightarrow$ & \nt{def\_head} \\
+10. & \nt{def\_head} & $\longrightarrow$ & \texttt{def} \textit{id} \nt{param\_lists} \nt{ret\_type} \texttt{=} \nt{fun\_body} \\
+11. & \nt{param\_lists} & $\longrightarrow$ & \texttt{(} \nt{params} \texttt{)} \nt{param\_lists} \\
+12. & \nt{param\_lists} & $\longrightarrow$ & $\varepsilon$ \\
+13. & \nt{params} & $\longrightarrow$ & \nt{param} \nt{params\_n} \\
+14. & \nt{params} & $\longrightarrow$ & $\varepsilon$ \\
+15. & \nt{params\_n} & $\longrightarrow$ & \texttt{,} \nt{param} \nt{params\_n} \\
+16. & \nt{params\_n} & $\longrightarrow$ & $\varepsilon$ \\
+17. & \nt{param} & $\longrightarrow$ & \textit{id} \texttt{:} \nt{type} \\
+18. & \nt{ret\_type} & $\longrightarrow$ & \texttt{:} \nt{type} \\
+19. & \nt{ret\_type} & $\longrightarrow$ & $\varepsilon$ \\
+20. & \nt{type} & $\longrightarrow$ & \texttt{Int} \\
+21. & \nt{type} & $\longrightarrow$ & \texttt{Double} \\
+22. & \nt{type} & $\longrightarrow$ & \texttt{String} \\
+23. & \nt{type} & $\longrightarrow$ & \texttt{Unit} \\
+24. & \nt{type} & $\longrightarrow$ & \texttt{Boolean} \\
+25. & \nt{fun\_body} & $\longrightarrow$ & \nt{expr} \\
+26. & \nt{fun\_body} & $\longrightarrow$ & \textit{EOL} \nt{block} \\
+27. & \nt{ext\_head} & $\longrightarrow$ & \texttt{extension} \texttt{(} \textit{id} \texttt{:} \nt{type} \texttt{)} \textit{EOL} \textit{INDENT} \nt{ext\_defs} \textit{DEDENT} \\
+28. & \nt{ext\_defs} & $\longrightarrow$ & \textit{EOL} \nt{ext\_defs} \\
+29. & \nt{ext\_defs} & $\longrightarrow$ & \nt{def\_head} \nt{ext\_defs} \\
+30. & \nt{ext\_defs} & $\longrightarrow$ & $\varepsilon$ \\
+31. & \nt{block} & $\longrightarrow$ & \textit{EOL} \textit{INDENT} \nt{stmt} \nt{stmt\_list} \textit{DEDENT} \\
+32. & \nt{stmt\_list} & $\longrightarrow$ & \textit{EOL} \nt{stmt\_rest} \\
+33. & \nt{stmt\_list} & $\longrightarrow$ & \texttt{;} \nt{stmt\_rest} \\
+34. & \nt{stmt\_list} & $\longrightarrow$ & $\varepsilon$ \\
+35. & \nt{stmt\_rest} & $\longrightarrow$ & \nt{stmt} \nt{stmt\_list} \\
+36. & \nt{stmt\_rest} & $\longrightarrow$ & \textit{EOL} \nt{stmt\_rest} \\
+37. & \nt{stmt\_rest} & $\longrightarrow$ & $\varepsilon$ \\
+38. & \nt{stmt} & $\longrightarrow$ & \texttt{val} \textit{id} \nt{opt\_type} \texttt{=} \nt{expr} \\
+39. & \nt{stmt} & $\longrightarrow$ & \texttt{var} \textit{id} \nt{opt\_type} \texttt{=} \nt{expr} \\
+40. & \nt{stmt} & $\longrightarrow$ & \textit{id} \texttt{=} \nt{expr} \\
+41. & \nt{stmt} & $\longrightarrow$ & \nt{expr} \\
+42. & \nt{stmt} & $\longrightarrow$ & \texttt{return} \nt{ret\_val} \\
+43. & \nt{stmt} & $\longrightarrow$ & \texttt{if} \nt{expr} \texttt{then} \nt{body} \nt{else\_part} \\
+44. & \nt{stmt} & $\longrightarrow$ & \texttt{while} \nt{expr} \texttt{do} \nt{body} \\
+45. & \nt{stmt} & $\longrightarrow$ & \texttt{for} \nt{for\_head} \texttt{do} \nt{body} \\
+46. & \nt{opt\_type} & $\longrightarrow$ & \texttt{:} \nt{type} \\
+47. & \nt{opt\_type} & $\longrightarrow$ & $\varepsilon$ \\
+48. & \nt{ret\_val} & $\longrightarrow$ & \nt{expr} \\
+49. & \nt{ret\_val} & $\longrightarrow$ & $\varepsilon$ \\
+50. & \nt{else\_part} & $\longrightarrow$ & \texttt{else} \nt{body} \\
+51. & \nt{else\_part} & $\longrightarrow$ & \textit{EOL} \texttt{else} \nt{body} \\
+52. & \nt{else\_part} & $\longrightarrow$ & $\varepsilon$ \\
+53. & \nt{body} & $\longrightarrow$ & \nt{block} \\
+54. & \nt{body} & $\longrightarrow$ & \nt{stmt} \\
+55. & \nt{for\_head} & $\longrightarrow$ & \nt{generator} \nt{step} \nt{guards} \\
+56. & \nt{for\_head} & $\longrightarrow$ & \textit{EOL} \textit{INDENT} \nt{generator} \nt{step} \nt{guards\_ml} \textit{DEDENT} \\
+57. & \nt{generator} & $\longrightarrow$ & \textit{id} \texttt{\textless-} \nt{expr} \nt{range} \nt{expr} \\
+58. & \nt{range} & $\longrightarrow$ & \texttt{to} \\
+59. & \nt{range} & $\longrightarrow$ & \texttt{until} \\
+60. & \nt{step} & $\longrightarrow$ & \texttt{by} \nt{expr} \\
+61. & \nt{step} & $\longrightarrow$ & $\varepsilon$ \\
+62. & \nt{guards} & $\longrightarrow$ & \texttt{if} \nt{expr} \nt{guards} \\
+63. & \nt{guards} & $\longrightarrow$ & $\varepsilon$ \\
+64. & \nt{guards\_ml} & $\longrightarrow$ & \textit{EOL} \texttt{if} \nt{expr} \nt{guards\_ml} \\
+65. & \nt{guards\_ml} & $\longrightarrow$ & $\varepsilon$ \\
+66. & \nt{if\_expr} & $\longrightarrow$ & \texttt{if} \nt{expr} \texttt{then} \nt{branch} \nt{else\_e} \\
+67. & \nt{else\_e} & $\longrightarrow$ & \texttt{else} \nt{branch} \\
+68. & \nt{else\_e} & $\longrightarrow$ & \textit{EOL} \texttt{else} \nt{branch} \\
+69. & \nt{branch} & $\longrightarrow$ & \nt{expr} \\
+70. & \nt{branch} & $\longrightarrow$ & \nt{block} \\
+\end{longtable}}

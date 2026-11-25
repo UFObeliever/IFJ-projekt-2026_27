@@ -1,0 +1,385 @@
+% =============================================================================
+% Dokumentace projektu IFJ/IAL 2026/2027 -- překladač IFJ26 -> IFJcode26
+% Struktura a styl vycházejí z dokumentace z roku 2020.
+%
+% Překlad:   make            (latexmk -pdf; vyžaduje českou lokalizaci babel)
+% Tabulky:   make tabulky    (gen_tabulky.py přegeneruje *.tex tabulky)
+%
+% Místa, která musí doplnit tým, jsou \todo{...} (červeně). Před odevzdáním
+% je smažte a přepněte \drafttrue na \draftfalse.
+% =============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[czech]{babel}
+\usepackage{mathptmx}                       % písmo Times
+\usepackage[a4paper, top=3cm, left=2cm, textwidth=17cm, textheight=24cm]{geometry}
+\usepackage{parskip}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs,tabularx,longtable,array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{pdflscape}
+\usepackage[unicode,pdftitle={Překladač pro jazyk IFJ26},hidelinks]{hyperref}
+
+\setlist{itemsep=1pt,topsep=3pt,parsep=0pt}
+\captionsetup{font=small,labelfont=bf}
+
+% --- značky pro nedodělaná místa --------------------------------------------
+\newif\ifdraft
+\drafttrue
+\newcommand{\todo}[1]{\ifdraft{\color{red}\textbf{[TODO: #1]}}\fi}
+
+% --- sazba -------------------------------------------------------------------
+\newcommand{\nt}[1]{$\langle$\textit{#1}$\rangle$}   % neterminál
+\newcommand{\file}[1]{\texttt{#1}}                   % soubor, identifikátor
+\newcommand{\ic}[1]{\texttt{#1}}                     % instrukce IFJcode26
+\newcommand{\dq}{\textquotedbl{}}                    % znak "
+\newcommand{\cf}[1]{\textcolor{red!70!black}{\textbf{#1}}} % konflikt v LL tabulce
+
+\begin{document}
+
+% =============================================================================
+% Titulní strana
+% =============================================================================
+\begin{titlepage}
+  \centering
+  \IfFileExists{img/FIT_barevne_CMYK_CZ.pdf}%
+    {\includegraphics[width=\textwidth]{img/FIT_barevne_CMYK_CZ.pdf}\par}%
+    {\todo{logo FIT: img/FIT\_barevne\_CMYK\_CZ.pdf}\par}
+  \vspace{\stretch{0.382}}
+
+  {\huge\bfseries Překladač pro jazyk IFJ26 \par}
+  {\Large \textbf{Dokumentace k projektu} \par}
+  {\Large Tým \todo{číslo týmu}, varianta vv-BVS \par}
+  \vspace{1.5cm}
+
+  \large
+  \begin{tabular}{l l l l | r}
+    \textbf{\todo{Jméno Příjmení}} & (\todo{xlogin00}) & \todo{os.\,č.} & -- \textbf{vedoucí} & \todo{25\,\%} \\
+    \todo{Matěj Okruhlica} & (\todo{xokruhm00}) & \todo{os.\,č.} & & \todo{25\,\%} \\
+    \todo{Alex Oľšavský} & (\todo{xolsava00}) & \todo{os.\,č.} & & \todo{25\,\%} \\
+    \todo{Jaroslav Vančura} & (\todo{xvancuj00}) & \todo{os.\,č.} & & \todo{25\,\%} \\
+    \todo{Klára Vantuchová} & (\todo{xvantuk00}) & \todo{os.\,č.} & & \todo{25\,\%} \\
+  \end{tabular}
+
+  \vspace{1.2cm}
+  {\Large Implementovaná rozšíření: \par}
+  {\large FUNEXP, BOOLTHEN, CONTROL, VALMEM, INTERPOLATEDS, EXTKW, PARAMLISTS \par}
+
+  \vspace{0.8cm}
+  {\large Git repozitář: \todo{odkaz} \par}
+
+  \vspace{\stretch{0.618}}
+  {\large \today\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Práce v týmu}
+% =============================================================================
+\todo{stručně: jak jsme si práci naplánovali, jak se plnily termíny, kdy jsme spolupracovali (rozhraní mezi moduly, párové programování)}
+
+\subsection{Rozdělení práce}
+
+\begin{itemize}
+  \item \todo{Jméno (login)}
+    \begin{itemize}
+      \item \todo{např.\ lexikální analýza, diagram konečného automatu, \ldots}
+    \end{itemize}
+  \item \todo{Jméno (login)}
+    \begin{itemize}
+      \item \todo{např.\ syntaktická analýza, precedenční analýza, LL gramatika a tabulka, \ldots}
+    \end{itemize}
+  \item \todo{Jméno (login)}
+    \begin{itemize}
+      \item \todo{např.\ tabulka symbolů, sémantické kontroly, \ldots}
+    \end{itemize}
+  \item \todo{Jméno (login)}
+    \begin{itemize}
+      \item \todo{např.\ generátor cílového kódu, testovací sada, dokumentace, \ldots}
+    \end{itemize}
+\end{itemize}
+
+\todo{povinně zdůvodnit odchylky od rovnoměrného rozdělení bodů, pokud nastaly}
+
+\subsection{Organizace práce}
+
+\todo{verzovací systém, větve, pull requesty, kolik schválení se vyžaduje, kultura code review}
+
+Testování probíhalo ve třech formách. \emph{End-to-end testy} přeloží zdrojový program IFJ26 překladačem, vygenerovaný kód provedou v interpretu \file{ic26int} a porovnají standardní výstup i návratový kód s očekávaným; testy jsou rozdělené do skupin podle částí jazyka (adresáře \file{tests/generator} a \file{tests/compiler}). Očekávané výstupy jsme ověřovali překladačem Scala (\file{ifj26.scala}). \emph{Statické kontroly} vygenerovaného kódu hlídají unikátnost návěští, existenci cílů skoků a to, že se \ic{DEFVAR} vypisují jen na začátku funkce. \todo{další formy testování}
+
+Kód formátujeme nástrojem \todo{např.\ clang-format, konfigurace}; funkce jsou dokumentovány komentáři ve formátu Doxygen (\texttt{@brief}, \texttt{@param}).
+
+% =============================================================================
+\section{Návrh překladače}
+% =============================================================================
+Náš překladač čte zdrojový program ze standardního vstupu a vypisuje kód IFJcode26 na standardní výstup. Skládá se z lexikální analýzy, syntaktické a sémantické analýzy, tabulky symbolů a generátoru kódu (obrázek~\ref{fig:arch}). Syntaktická analýza je řízená rekurzivním sestupem a výrazy zpracovává precedenční syntaktickou analýzou. Překlad je syntaxí řízený: parser staví abstraktní syntaktický strom (AST) anotovaný typy výrazů a z něj generátor vytváří výstupní kód. Při chybě překladač skončí s příslušným návratovým kódem a na výstup nevypíše nic.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+    >=Stealth, node distance=11mm,
+    blk/.style={draw, rounded corners=3pt, minimum width=4.2cm, minimum height=10mm,
+                align=center, fill=gray!8, font=\small},
+    io/.style={draw, minimum width=4.2cm, minimum height=8mm, align=center,
+               font=\small, fill=white},
+    dat/.style={font=\footnotesize\itshape, align=left},
+    err/.style={draw, dashed, rounded corners=3pt, minimum width=3cm,
+                minimum height=10mm, align=center, font=\small}
+  ]
+  \node[io]  (src) {Zdrojový kód IFJ26\\(\texttt{stdin})};
+  \node[blk, below=of src] (lex) {Lexikální analýza\\\file{lexer.c}};
+  \node[blk, below=of lex, minimum width=5.4cm] (par)
+        {Syntaktická a sémantická analýza\\\file{parser.c}, \file{precedence.c}};
+  \node[blk, right=34mm of par, minimum width=3.6cm] (sym)
+        {Tabulka symbolů\\\file{symtable.c} (AVL)};
+  \node[blk, below=of par] (gen) {Generátor kódu\\\file{generator.c}};
+  \node[io, below=of gen] (out) {Kód IFJcode26\\(\texttt{stdout})};
+  \node[err, left=16mm of par] (err) {Chyba:\\návratový kód\\\file{Error.h}};
+
+  \draw[->] (src) -- (lex) node[midway, right, dat] {posloupnost znaků};
+  \draw[->] (lex) -- (par) node[midway, right, dat] {tokeny (\texttt{Token})};
+  \draw[<->] (par) -- (sym) node[midway, above, dat] {záznamy\\[-2pt]\texttt{symtable\_entry}};
+  \draw[->] (par) -- (gen) node[midway, right, dat]
+        {AST (\texttt{ASTNode}) s typy\\[-2pt]výrazů (\texttt{expr\_type})};
+  \draw[->] (gen) -- (out) node[midway, right, dat] {textový kód};
+  \draw[->, dashed] (lex.west) -| (err.north);
+  \draw[->, dashed] (par.west) -- (err.east);
+  \draw[->, dashed] (gen.west) -| (err.south);
+\end{tikzpicture}
+\caption{Blokové schéma překladače a datové toky mezi moduly.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Lexikální analýza}
+\label{sec:lexer}
+
+Lexikální analyzátor (\file{lexer.c}) je implementovaný jako deterministický konečný automat, jehož diagram je v \hyperref[sec:fa]{příloze}~\ref{sec:fa}. Funkce \texttt{get\_next\_token} čte vstup po znacích a vrací vždy jeden token: jeho typ a podle typu lexém (identifikátory, literály) nebo počet mezer (odsazení). Lexém se při čtení skládá do dynamického řetězce (\file{DynBuff}) a do tokenu se předává jeho kopie. Že identifikátor je klíčové slovo, rozhoduje \texttt{keyword\_check} po načtení celého identifikátoru. Lexikální chyba se vrací jako token \texttt{T\_ERROR}, který parser převede na návratový kód~1.
+
+Odchylky od standardního modelu konečného automatu:
+\begin{itemize}
+  \item \textbf{Odsazení a konce řádků.} Bloky jsou v IFJ26 vymezeny odsazením, proto lexer vrací počet mezer na začátku logického řádku jako token \texttt{T\_INDENTS} a konec řádku jako \texttt{T\_EOL}. Tabulátor na začátku řádku je lexikální chyba.
+  \item \textbf{Vnořené blokové komentáře} automat bez čítače nezvládne, proto se hloubka vnoření počítá. Komentář obsahující konec řádku se chová jako konec řádku.
+  \item \textbf{Řetězce.} U běžných řetězců se escape sekvence (\texttt{\textbackslash n}, \texttt{\textbackslash r}, \texttt{\textbackslash t}, \texttt{\textbackslash\textbackslash}, \texttt{\textbackslash\dq}) převádějí přímo v lexeru na odpovídající znak. Víceřádkové řetězce (\texttt{\dq\dq\dq}) se čtou doslovně.
+  \item \textbf{Čísla.} Podtržítka mezi číslicemi zůstávají v lexému a odstraňují se až při převodu na hodnotu. Desetinný literál může končit příponou \texttt{d} nebo \texttt{D}.
+  \item \textbf{Anotace \ic{@main}} je jeden token (\texttt{T\_FUNC\_MAIN}).
+\end{itemize}
+
+\subsection{Syntaktická analýza}
+
+\subsubsection{Rekurzivní sestup}
+
+Parser (\file{parser.c}) implementuje rekurzivní sestup podle LL gramatiky v příloze~\ref{sec:ll-gram}. Tokeny z lexeru se před zpracováním ukládají do bufferu (\texttt{raw\_token}), takže parser může vstup procházet opakovaně a nahlížet na následující token (\texttt{peek\_token}). Konec bloku se pozná podle odsazení: gramatika s ním pracuje jako s virtuálním terminálem \textit{DEDENT}.
+
+Gramatika je LL(1) až na čtyři místa (tabulka v příloze~\ref{sec:ll-tab}): rozlišení přiřazení od výrazu začínajícího identifikátorem (rozhodne druhý token, \texttt{=}), příkaz \texttt{if} oproti výrazu \texttt{if} na začátku příkazu, a dvě místa týkající se větve \texttt{else} (nejbližší \texttt{if} a zarovnání \texttt{else} na stejné odsazení jako \texttt{if}). Každé řešíme kontextem, ne změnou gramatiky.
+
+Zadání dovoluje volat funkci před její definicí a funkce se mohou volat vzájemně. Z toho důvodu parser před hlavním průchodem projde buffer tokenů a zapíše do globální tabulky symbolů hlavičky všech funkcí (\texttt{collect\_signatures}); těla funkcí přitom přeskočí. Tělo funkce se pak analyzuje při hlavním průchodu v pořadí zdrojového kódu (\texttt{analyze\_function}), a je-li při volání potřeba návratový typ funkce, jejíž tělo ještě nebylo zpracováno, analyzuje se její tělo přednostně (\texttt{resolve\_function}); stav analýzy těla si funkce nese v tabulce symbolů. \todo{ověřit popis proti precedence.c}
+
+\subsubsection{Precedenční syntaktická analýza}
+\label{sec:prec}
+
+Výrazy zpracovává precedenční analýza (\file{precedence.c}) se zásobníkem operátorů a zásobníky typů a uzlů AST. Při redukci operátoru se z operandů vytvoří uzel AST a vypočítá se typ výsledku (včetně implicitního převodu Int na Double); nesouhlasí-li typy operandů, analýza skončí typovou chybou. Unární a binární \texttt{-} se rozliší podle toho, zda se na daném místě očekává operand, nebo operátor. Volání funkce uvnitř výrazu zpracovává rekurzivně \texttt{parse\_call} a z pohledu precedenční analýzy se chová jako operand. Priority a asociativita operátorů, včetně operátorů rozšíření BOOLTHEN, jsou v příloze~\ref{sec:prec-tab}.
+
+\subsubsection{Sémantické kontroly}
+
+Sémantické kontroly provádí parser za běhu analýzy. Kontroluje se existence a redefinice proměnných a funkcí, počet a typy argumentů při volání, kompatibilita typů ve výrazech, přiřazeních a inicializacích, zápis do nemodifikovatelné proměnné nebo parametru a pravidla pro příkaz \texttt{return}. Návratový typ funkce bez explicitního typu se odvodí z jejího těla. Existenci právě jedné funkce s anotací \ic{@main}, bez parametrů a s návratovým typem \texttt{Unit}, kontroluje parser při zpracování definic funkcí. Typ každého výrazu se ukládá do uzlu AST (\texttt{expr\_type}), takže generátor už žádné sémantické kontroly neprovádí.
+
+\subsection{Vnitřní reprezentace kódu}
+
+Parser vytváří abstraktní syntaktický strom z uzlů \texttt{ASTNode}. Uzel má typ (\texttt{ASTNodeType}), odkaz \texttt{next} na dalšího sourozence a datovou část podle typu uzlu. Seznamy (příkazy bloku, parametry funkce, argumenty volání, funkce programu) jsou řetězeny přes \texttt{next}. Kořenem je \texttt{AST\_PROGRAM} se seznamem funkcí (\texttt{AST\_FUNC\_DEF}), tělo funkce, větve \texttt{if} a tělo \texttt{while} jsou bloky (\texttt{AST\_BLOCK}). Každý uzel nese datový typ hodnoty, kterou představuje (\texttt{expr\_type}); u definice proměnné a přiřazení je to typ proměnné, u funkce její návratový typ a u parametru jeho typ. Uzel funkce nese navíc příznak \texttt{is\_main}. Jednořádkové tělo funkce se reprezentuje jako blok s jediným výrazem.
+
+\subsection{Tabulka symbolů}
+
+Tabulku symbolů (\file{symtable.c}) jsme podle zvolené varianty implementovali jako vyvážený binární vyhledávací strom (AVL), jehož klíčem je jméno identifikátoru. Parser s ní pracuje jako se zásobníkem rozsahů: každý blok kódu otevírá nový rozsah (nový AVL strom) a při jeho opuštění se rozsah zruší. Rozsah s indexem~0 je globální a obsahuje funkce, včetně vestavěných, které se vkládají při inicializaci. Vyhledávání prochází rozsahy od nejvnitřnějšího, takže vnořená definice překryje stejnojmennou proměnnou z vnějšího bloku. Vložení jména do rozsahu, kde už je, je chyba redefinice (kód~4).
+
+Záznam \texttt{symtable\_entry} obsahuje typ, příznaky (funkce, proměnná, nemodifikovatelná hodnota), pro funkce počet a typy parametrů a stav analýzy těla funkce (\texttt{BODY\_PENDING}, \texttt{BODY\_IN\_PROGRESS}, \texttt{BODY\_DONE}) s pozicemi v bufferu tokenů, které umožňují analyzovat tělo odloženě. Návratové kódy překladače jsou v tabulce~\ref{tab:errors}.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{@{}cl@{}}
+  \toprule
+  Kód & Význam \\
+  \midrule
+  1 & lexikální chyba \\
+  2 & syntaktická chyba (včetně chybějícího prologu) \\
+  3 & nedefinovaná funkce, proměnná nebo typ; chybějící \ic{@main} \\
+  4 & redefinice funkce, proměnné nebo typu \\
+  5 & špatný počet nebo typ argumentů; nepovolené parametry \ic{@main} \\
+  6 & typová nekompatibilita, nelze odvodit typ \\
+  7 & zápis do nemodifikovatelné proměnné nebo parametru \\
+  10 & ostatní sémantické chyby \\
+  99 & interní chyba překladače \\
+  \bottomrule
+\end{tabular}
+\caption{Návratové kódy překladače.}
+\label{tab:errors}
+\end{table}
+
+\subsection{Generátor cílového kódu}
+
+Generátor (\file{generator.c}) prochází AST a vypisuje kód IFJcode26. Veškerý jeho stav je v kontextu \texttt{GeneratorContext}, takže nepoužívá globální proměnné. Kód se skládá do bufferu v paměti a zapíše se na výstup až po úspěšném průchodu celým AST; při chybě nevznikne částečný výstup.
+
+\subsubsection{Konvence volání funkcí a využití rámců}
+\label{sec:konvence_volani}
+
+Každá funkce má návěští \ic{\$fn\_}\textit{jméno}, začíná instrukcí \ic{PUSHFRAME} a končí \ic{POPFRAME} a \ic{RETURN}. Všechny proměnné funkce se definují najednou hned za \ic{PUSHFRAME}, jinak by se definice uvnitř těla cyklu provedla při každé iteraci znovu a interpret by skončil chybou. Počet definic zjistí generátor předem rekurzivním průchodem tělem funkce. Proměnná se jmenuje \ic{LF@\$v}\textit{n}, kde \textit{n} je pořadové číslo deklarace ve funkci (parametry mají čísla $0$ až $k-1$). Jména se přiřazují zásobníkem dvojic (jméno, číslo), který se na konci bloku zkrátí, čímž končí viditelnost proměnné; stejně pojmenované proměnné v různých blocích tak mají různá čísla.
+
+\emph{Volající} nejprve vyhodnotí všechny argumenty na datový zásobník, pak vytvoří dočasný rámec (\ic{CREATEFRAME}), argumenty ze zásobníku odzadu uloží do proměnných \ic{TF@\$v}\textit{i} a zavolá funkci (\ic{CALL}). Vyhodnocení všech argumentů před vytvořením rámce je nutné kvůli rozšíření FUNEXP: vnořené volání by jinak přepsalo už rozpracovaný dočasný rámec. Volaná funkce předává návratovou hodnotu přes globální proměnnou \ic{GF@\_ret}, volající ji po návratu uloží na zásobník, kde se s ní dále pracuje jako s hodnotou výrazu. Hodnotou funkce je poslední výraz těla nebo hodnota příkazu \texttt{return}; ve funkci s návratovým typem \texttt{Unit} se hodnota zahodí a vrací se \ic{nil@nil}. Úvodní kód programu zavolá funkci s anotací \ic{@main} a skončí instrukcí \ic{EXIT int@0}. Globální rámec se kromě \ic{GF@\_ret} používá pro pomocné proměnné \ic{GF@\_t1} až \ic{GF@\_t6}.
+
+\subsubsection{Vyhodnocování výrazů}
+
+Výrazy se vyhodnocují zásobníkově: hodnota výrazu je vždy na vrcholu datového zásobníku a kód se generuje průchodem AST. Například sčítání proměnné \texttt{a} a konstanty \texttt{8} se přeloží na
+
+\begin{center}
+\texttt{PUSHS LF@\$v0\\PUSHS int@8\\ADDS}
+\end{center}
+
+Je-li jeden operand Int a druhý Double, převede se Int hned po vyhodnocení instrukcí \ic{INT2FLOATS}. Relace \texttt{<} a \texttt{>} odpovídají \ic{LTS} a \ic{GTS}; \texttt{<=} a \texttt{>=} se skládají z \ic{LTS}/\ic{GTS}, \ic{EQS} a \ic{ORS}, protože negace opačné relace by pro hodnotu NaN dávala špatný výsledek. Konkatenace řetězců nemá zásobníkovou instrukci, proto se hodnoty vyzvednou do pomocných proměnných a použije se \ic{CONCAT}. Podmínka příkazů \texttt{if} a \texttt{while} se vyhodnotí na zásobník, porovná s \ic{bool@false} a instrukcí \ic{JUMPIFEQS} se skočí za příslušnou větev. Návěští (\ic{\$else\_}\textit{n}, \ic{\$endif\_}\textit{n}, \ic{\$while\_}\textit{n}, \ic{\$endwhile\_}\textit{n}) jsou unikátní díky čítači v kontextu generátoru.
+
+\subsubsection{Vestavěné funkce}
+
+Jednoduché vestavěné funkce (\texttt{print}, \texttt{toStr}, \texttt{toInt}, \texttt{strLength}, \texttt{chr}, \texttt{readLine}) se generují přímo v místě volání podle statického typu argumentu. Složitější případy jsou pomocné rutiny ve výstupním kódu, volané instrukcí \ic{CALL}; argumenty dostávají na datovém zásobníku a výsledek na něm zanechávají (tabulka~\ref{tab:helpers}).
+
+\begin{table}[ht]
+\centering
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+  \toprule
+  Rutina & Účel \\
+  \midrule
+  \ic{\$\$idiv} & celočíselné dělení Int zaokrouhlené k nule; výsledek \ic{IDIV} se opraví podle znaménka zbytku, takže rutina funguje při zaokrouhlení k nule i k $-\infty$ \\
+  \ic{\$\$ord} & \texttt{ord}; mimo rozsah vrací $-1$ \\
+  \ic{\$\$substr} & \texttt{subStr}; při špatných mezích \ic{EXIT int@40} \\
+  \ic{\$\$readint}, \ic{\$\$readdouble} & čtení čísla; při neplatném vstupu nebo EOF vrací 0 \\
+  \bottomrule
+\end{tabularx}
+\caption{Pomocné rutiny generátoru.}
+\label{tab:helpers}
+\end{table}
+
+Zadání uvádí, že \ic{IDIV} zaokrouhluje k $-\infty$, interpret \file{ic26int} ale dělí k nule; proto je \ic{\$\$idiv} napsaná nezávisle na zaokrouhlení. Instrukce \ic{READ} ukládá při chybném vstupu a na konci souboru hodnotu \ic{nil}, kdežto IFJ26 požaduje nulu; to řeší rutiny \ic{\$\$readint} a \ic{\$\$readdouble}. Dělení nulou a \texttt{chr} mimo rozsah hlásí přímo interpret.
+
+\subsection{Přehled modulů}
+
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+  \toprule
+  Modul & Popis \\
+  \midrule
+  \file{main.c} & Čte zdrojový kód, spouští parser a po jeho úspěchu generátor, vrací návratový kód. \\
+  \file{lexer.c/h} & Lexikální analyzátor: převádí vstup na tokeny, zpracovává odsazení a komentáře. \\
+  \file{parser.c/h} & Syntaktický a sémantický analyzátor (rekurzivní sestup), staví AST. \\
+  \file{precedence.c/h} & Precedenční analýza výrazů, typová kontrola výrazů a volání funkcí. \\
+  \file{symtable.c/h} & Tabulka symbolů: zásobník rozsahů s AVL stromy a vestavěné funkce. \\
+  \file{ast.c/h} & Uzly abstraktního syntaktického stromu a jejich tvorba. \\
+  \file{generator.c/h} & Generátor kódu IFJcode26 z AST. \\
+  \file{DynBuff.c/h} & Dynamický řetězcový buffer (lexer, generátor). \\
+  \file{Error.h} & Výčet návratových kódů překladače. \\
+  \bottomrule
+\end{tabularx}
+
+% =============================================================================
+\section{Rozšíření}
+% =============================================================================
+Rozšíření jsou zpracována hlavně v parseru a generátor oproti základnímu zadání mění jen málo. \todo{u každého rozšíření upravit popis podle skutečné implementace}
+
+\subsection{FUNEXP}
+Volání vestavěné i uživatelské funkce je součástí výrazu a argumentem může být libovolný výraz. Parser volání zpracovává rekurzivně (\texttt{parse\_call}) a ve výrazu se chová jako operand. Generátor vyhodnocuje argumenty na datový zásobník před vytvořením rámce (viz \ref{sec:konvence_volani}), proto je vnořená volání nepřepisují.
+
+\subsection{BOOLTHEN}
+Typ \texttt{Boolean}, literály \texttt{true} a \texttt{false} a operátory \texttt{!}, \texttt{\&\&}, \texttt{||} jsou v precedenční analýze s prioritami podle zadání. Operátory \texttt{\&\&} a \texttt{||} se vyhodnocují zkratově instrukcí \ic{JUMPIFEQS}: pravý operand se nevyhodnotí, je-li výsledek znám z levého. Pro \texttt{toStr} nad hodnotou typu Boolean slouží pomocná rutina a funkce \texttt{readBoolean} převádí \ic{nil} (neplatný vstup) na \texttt{false}. LL gramatika dovoluje \texttt{if} bez \texttt{else} i řetězení \texttt{else if}.
+
+\subsection{CONTROL}
+Příkaz \texttt{if} lze použít jako výraz: každá větev nechá na zásobníku jednu hodnotu, převedenou na společný typ. Cyklus \texttt{for} s generátorem \texttt{to}, \texttt{until} a \texttt{by} a se stráží vyhodnotí meze a krok jednou do pomocných proměnných; nulový krok ukončí program s kódem~40. Pomocné proměnné cyklu se definují stejně jako ostatní na začátku funkce.
+
+\subsection{VALMEM}
+Zápis \texttt{výraz.člen} (\texttt{toString}, \texttt{toInt}, \texttt{floor}, \texttt{length}) parser převádí na volání vestavěných funkcí. Pro \texttt{floor} existuje pomocná rutina, protože IFJcode26 nemá instrukci pro zaokrouhlení dolů.
+
+\subsection{INTERPOLATEDS}
+Interpolovaný řetězec se rozloží na literály a vložené výrazy; každý výraz se převede na řetězec stejně jako ve funkci \texttt{toStr} a všechny části se spojí konkatenací.
+
+\subsection{EXTKW}
+Rozšiřující metoda se přeloží jako obyčejná funkce, jejímž prvním parametrem je příjemce. Parser jí podle typu příjemce a jména metody přidělí jedinečné jméno (např.\ \texttt{Int\$plus}), takže metody stejného jména pro různé typy nekolidují. Volání \texttt{x.plus(12)} se změní na volání takové funkce.
+
+\subsection{PARAMLISTS}
+Funkce s více seznamy parametrů se zploští na funkci s jedním spojeným seznamem parametrů a volání s více seznamy argumentů na jedno volání, argumenty se vyhodnocují zleva doprava. Funkce bez seznamu parametrů se volá jako funkce bez argumentů.
+
+% =============================================================================
+\section{Využití prostředků AI}
+% =============================================================================
+\todo{popsat podle požadavků sekce 4 hlavního zadání: jaké nástroje AI, k čemu (např.\ generátor kódu, testy, dokumentace), co z výstupu bylo převzato nebo upraveno a jak jsme výsledek ověřili (testy, ruční kontrola, srovnání se Scalou)}
+
+% =============================================================================
+\section*{Reference}
+% =============================================================================
+\begin{thebibliography}{9}
+  \bibitem{zadani} Ondryáš, O., Křivka, Z.: \emph{Specifikace jazyků IFJ26 a IFJcode26 (IFJ/IAL 2026/2027)}. FIT VUT v Brně.
+  \bibitem{scala} \emph{Scala 3 documentation}. \url{https://docs.scala-lang.org/scala3/}
+  \bibitem{prednasky} Přednášky předmětů IFJ a IAL, FIT VUT v Brně (lexikální a syntaktická analýza, precedenční analýza, AVL stromy). \todo{přesné zdroje}
+\end{thebibliography}
+\todo{doplnit všechny převzaté zdroje včetně kódu a algoritmů, u převzatého kódu uvést místo použití}
+
+% =============================================================================
+\section*{Přílohy}
+% =============================================================================
+\subsection*{A\quad Diagram konečného automatu pro lexikální analýzu}
+\label{sec:fa}
+\begin{figure}[ht]
+\centering
+\fbox{\parbox{0.92\linewidth}{\centering\vspace{4cm}
+  \todo{vložit diagram konečného automatu lexeru: stavy podle \texttt{enum State} v \file{lexer.h}, koncové stavy, přechody}
+  \vspace{4cm}}}
+\end{figure}
+\newpage
+
+\subsection*{B\quad LL gramatika pro rekurzivní sestup}
+\label{sec:ll-gram}
+Terminály \textit{INDENT} a \textit{DEDENT} jsou virtuální: lexer vrací počet mezer na začátku řádku, parser z něj odvozuje začátek a konec bloku. Neterminál \nt{expr} zpracovává precedenční analýza. Neterminály \nt{def\_head}, \nt{ext\_head} a \nt{else\_part} se jmenují jinak než stejnojmenná klíčová slova, aby se nepletly.
+
+\input{gramatika.tex}
+\clearpage
+
+\begin{landscape}
+\thispagestyle{empty}
+\subsection*{C\quad LL tabulka}
+\label{sec:ll-tab}
+\begin{center}
+\resizebox{0.8\linewidth}{!}{\input{ll_tabulka.tex}}
+\end{center}
+\par\small
+\textbf{Poznámky.} Sloupec \textit{literal} zahrnuje celočíselné, desetinné i řetězcové literály. Neterminál \nt{expr} zpracovává precedenční analýza, proto pro něj tabulka nemá řádek; FIRST(\nt{expr}) $=\{$\textit{id}, \textit{literal}, \texttt{true}, \texttt{false}, \texttt{(}, \texttt{-}, \texttt{!}, \texttt{if}$\}$. Tokeny \texttt{to}, \texttt{until} a \texttt{by} jsou identifikátory se zadaným lexémem a \texttt{<-} vrací lexer jako dvojici tokenů \texttt{<} a \texttt{-}. Sloupce terminálů, které nejsou v žádné buňce (\texttt{ifj26}, \texttt{.}, \texttt{*}, \texttt{<-}, \texttt{then}, \textit{INDENT}), jsou vynechány.
+
+\textbf{Konflikty} (červeně) a jejich řešení mimo tabulku:
+\begin{itemize}[itemsep=1pt]
+  \item[] \cf{40/41} (\textit{id}): přiřazení, je-li druhým tokenem \texttt{=}, jinak výraz.
+  \item[] \cf{41/43} (\texttt{if}): na začátku příkazu se \texttt{if} zpracuje jako příkaz (pravidlo 43); \texttt{if} jako výraz (pravidlo 66) se použije na místě operandu. Je-li \texttt{if} posledním příkazem bloku, jehož hodnota se využije (např.\ tělo funkce), musí ho parser chápat jako výraz. \todo{ověřit, jak to parser řeší}
+  \item[] \cf{50/52} (\texttt{else}): \texttt{else} patří nejbližšímu \texttt{if}.
+  \item[] \cf{51/52} (\textit{EOL}): pravidlo 51, začíná-li další řádek klíčovým slovem \texttt{else} zarovnaným s \texttt{if}, jinak pravidlo 52.
+\end{itemize}
+\end{landscape}
+
+\subsection*{D\quad Gramatika pro precedenční analýzu}
+\label{sec:psa-gram}
+\input{psa_gramatika.tex}
+
+\subsection*{E\quad Precedenční tabulka}
+\label{sec:prec-tab}
+Priority a asociativita operátorů podle zadání:
+
+\begin{center}
+\input{prec_priority.tex}
+\end{center}
+
+Symboly v tabulce: $\lessdot$ posun, $\gtrdot$ redukce, $\doteq$ shoda závorek, A přijetí, prázdná buňka chyba (včetně zakázaného řetězení relačních operátorů). Řádky odpovídají operátoru na vrcholu zásobníku, sloupce vstupnímu symbolu; \textit{i} je operand (literál, identifikátor, výsledek volání funkce).
+
+\begin{center}
+\input{prec_tabulka.tex}
+\end{center}
+
+\end{document}

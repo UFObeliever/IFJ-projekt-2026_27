@@ -1,3 +1,13 @@
+/**
+ * @file dyn_buff.h
+ *
+ * Překladač jazyka IFJ26
+ *
+ * @brief Rozhraní error zpráv.
+ *
+ * @author Matěj Okruhlica (xokruhm00)
+ */
+
 #ifndef ERROR_H
 #define ERROR_H
 
