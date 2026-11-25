@@ -1,5 +1,5 @@
-#ifndef _ERRORS_H_
-#define _ERRORS_H_
+#ifndef ERROR_H
+#define ERROR_H
 
 typedef enum error_value {
   SUCCESS,      // No error (return value 0)
