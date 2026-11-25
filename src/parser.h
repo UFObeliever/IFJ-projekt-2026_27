@@ -27,7 +27,7 @@ typedef struct {
 typedef struct ParserCtx {
   Token current_token;
   LexerCtx *lexer;
-  symtable smt;
+  Symtable smt;
   PrecedenceStack stack;
   TokenType ret_type;
   int main_count;
@@ -84,7 +84,7 @@ void parser_free(ParserCtx *ctx);
  * @param name: jméno funkce
  * @param fentry: záznam funkce v tabulce symbolů
  */
-int resolve_function(ParserCtx *ctx, const char *name, symtable_entry *fentry);
+int resolve_function(ParserCtx *ctx, const char *name, SymtableEntry *fentry);
 
 /**
  * @brief Zpracuje if jako výraz; volá ji precedenční analýza na místě operandu

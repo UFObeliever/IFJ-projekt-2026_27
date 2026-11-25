@@ -83,55 +83,57 @@ typedef struct {
 /**
  * @brief Inicializuje prázdný zásobník typů.
  *
- * @param s Zásobník typů.
+ * @param stack Zásobník typů.
  */
-static void tstack_init(TypeStack *s) { s->top = -1; }
+static void tstack_init(TypeStack *stack) { stack->top = -1; }
 
 /**
  * @brief Vloží typ na vrchol zásobníku typů.
  *
- * @param s Zásobník typů.
- * @param t Vkládaný typ.
+ * @param stack Zásobník typů.
+ * @param expr_type Vkládaný typ.
  * @return true při úspěchu, false při přeplnění zásobníku.
  */
-static bool tstack_push(TypeStack *s, ExprType t) {
-  if (s->top >= TYPE_STACK_MAX - 1) {
+static bool tstack_push(TypeStack *stack, ExprType expr_type) {
+  if (stack->top >= TYPE_STACK_MAX - 1) {
     DEBUG_LOG("[DEBUG] tstack_push overflow!\n");
     return false;
   }
-  DEBUG_LOG("[DEBUG] tstack_push: pushed type %d, new top = %d\n", t, s->top);
-  s->items[++s->top] = t;
+  DEBUG_LOG("[DEBUG] tstack_push: pushed type %d, new top = %d\n", expr_type,
+            stack->top);
+  stack->items[++stack->top] = expr_type;
   return true;
 }
 
 /**
  * @brief Odebere typ z vrcholu zásobníku typů.
  *
- * @param s Zásobník typů.
+ * @param stack Zásobník typů.
  * @param out Výstup: odebraný typ.
  * @return true při úspěchu, false na prázdném zásobníku.
  */
-static bool tstack_pop(TypeStack *s, ExprType *out) {
-  if (s->top < 0) {
+static bool tstack_pop(TypeStack *stack, ExprType *out) {
+  if (stack->top < 0) {
     DEBUG_LOG("[DEBUG] tstack_pop underflow!\n");
     return false;
   }
-  DEBUG_LOG("[DEBUG] tstack_pop: popped type %d, new top = %d\n", *out, s->top);
-  *out = s->items[s->top--];
+  DEBUG_LOG("[DEBUG] tstack_pop: popped type %d, new top = %d\n", *out,
+            stack->top);
+  *out = stack->items[stack->top--];
   return true;
 }
 
 /**
  * @brief Přečte typ z vrcholu zásobníku typů bez odebrání.
  *
- * @param s Zásobník typů.
+ * @param stack Zásobník typů.
  * @param out Výstup: typ na vrcholu.
  * @return true při úspěchu, false na prázdném zásobníku.
  */
-static bool tstack_peek(TypeStack *s, ExprType *out) {
-  if (s->top < 0)
+static bool tstack_peek(TypeStack *stack, ExprType *out) {
+  if (stack->top < 0)
     return false;
-  *out = s->items[s->top];
+  *out = stack->items[stack->top];
   return true;
 }
 
@@ -150,80 +152,80 @@ typedef struct {
 /**
  * @brief Inicializuje prázdný zásobník uzlů AST.
  *
- * @param s Zásobník uzlů.
+ * @param stack Zásobník uzlů.
  */
-static void ast_stack_init(ASTStack *s) { s->top = -1; }
+static void ast_stack_init(ASTStack *stack) { stack->top = -1; }
 
 /**
  * @brief Vloží uzel AST na vrchol zásobníku.
  *
- * @param s Zásobník uzlů.
+ * @param stack Zásobník uzlů.
  * @param node Vkládaný uzel.
  * @return true při úspěchu, false při přeplnění zásobníku.
  */
-static bool ast_stack_push(ASTStack *s, ASTNode *node) {
-  if (s->top >= TYPE_STACK_MAX - 1)
+static bool ast_stack_push(ASTStack *stack, ASTNode *node) {
+  if (stack->top >= TYPE_STACK_MAX - 1)
     return false;
-  s->items[++s->top] = node;
+  stack->items[++stack->top] = node;
   return true;
 }
 
 /**
  * @brief Odebere uzel AST z vrcholu zásobníku.
  *
- * @param s Zásobník uzlů.
+ * @param stack Zásobník uzlů.
  * @param out Výstup: odebraný uzel.
  * @return true při úspěchu, false na prázdném zásobníku.
  */
-static bool ast_stack_pop(ASTStack *s, ASTNode **out) {
-  if (s->top < 0)
+static bool ast_stack_pop(ASTStack *stack, ASTNode **out) {
+  if (stack->top < 0)
     return false;
-  *out = s->items[s->top--];
+  *out = stack->items[stack->top--];
   return true;
 }
 
 /**
  * @brief Vyprázdní precedenční zásobník.
  *
- * @param s Precedenční zásobník.
+ * @param stack Precedenční zásobník.
  */
-static void stack_clear(PrecedenceStack *s) {
-  s->top = -1;
+static void stack_clear(PrecedenceStack *stack) {
+  stack->top = -1;
   DEBUG_LOG("[DEBUG] precedence stack cleared\n");
 }
 
 /**
  * @brief Vloží token na vrchol precedenčního zásobníku.
  *
- * @param s Precedenční zásobník.
- * @param t Vkládaný token.
+ * @param stack Precedenční zásobník.
+ * @param tok_type Vkládaný token.
  * @return true při úspěchu, false při přeplnění zásobníku.
  */
-static bool stack_push(PrecedenceStack *s, TokenType t) {
-  if (s->top >= PREC_STACK_MAX - 1) {
+static bool stack_push(PrecedenceStack *stack, TokenType tok_type) {
+  if (stack->top >= PREC_STACK_MAX - 1) {
     DEBUG_LOG("[DEBUG] precedence stack overflow!\n");
     return false;
   }
-  DEBUG_LOG("[DEBUG] stack_push: token %d pushed, new stack top = %d\n", t,
-            s->top);
-  s->items[++s->top] = t;
+  DEBUG_LOG("[DEBUG] stack_push: token %d pushed, new stack top = %d\n",
+            tok_type, stack->top);
+  stack->items[++stack->top] = tok_type;
   return true;
 }
 
 /**
  * @brief Odebere token z vrcholu precedenčního zásobníku.
  *
- * @param s Precedenční zásobník.
+ * @param stack Precedenční zásobník.
  * @return true při úspěchu, false na prázdném zásobníku.
  */
-static bool stack_pop(PrecedenceStack *s) {
-  if (s->top < 0) {
+static bool stack_pop(PrecedenceStack *stack) {
+  if (stack->top < 0) {
     DEBUG_LOG("[DEBUG] precedence stack underflow on pop!\n");
     return false;
   }
   DEBUG_LOG("[DEBUG] stack_pop: removing token %d from top = %d\n",
-            s->items[s->top], s->top);
-  s->top--;
+            stack->items[stack->top], stack->top);
+  stack->top--;
   return true;
 }
 
@@ -232,11 +234,11 @@ static bool stack_pop(PrecedenceStack *s) {
  *
  * Rozpoznává celočíselný, desetinný a řetězcový literál a `true` či `false`.
  *
- * @param t Typ tokenu.
+ * @param tok_type Typ tokenu.
  * @return Typ literálu, pro ostatní tokeny EXPR_TYPE_UNKNOWN.
  */
-static ExprType expr_type_from_token(TokenType t) {
-  switch (t) {
+static ExprType expr_type_from_token(TokenType tok_type) {
+  switch (tok_type) {
   case T_INT_LITERAL:
     return EXPR_TYPE_INT;
   case T_DOUBLE_LITERAL:
@@ -256,13 +258,13 @@ static ExprType expr_type_from_token(TokenType t) {
  *
  * Rozpoznává `Int`, `Double`, `String`, `Unit` a `Boolean`.
  *
- * @param t Typ tokenu (klíčové slovo typu).
+ * @param tok_type Typ tokenu (klíčové slovo typu).
  * @return Odpovídající typ, pro ostatní tokeny EXPR_TYPE_UNKNOWN.
  */
-static ExprType expr_type_from_kw(TokenType t) {
-  if (t == T_TYPE_BOOLEAN)
+static ExprType expr_type_from_kw(TokenType tok_type) {
+  if (tok_type == T_TYPE_BOOLEAN)
     return EXPR_TYPE_BOOL;
-  switch (t) {
+  switch (tok_type) {
   case T_KW_INT:
     return EXPR_TYPE_INT;
   case T_KW_DOUBLE:
@@ -326,7 +328,7 @@ static const PrecedenceAction precedence_table[EX_COUNT][EX_COUNT] = {
  */
 static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
                                       ExprType *type) {
-  symtable_entry *entry = NULL;
+  SymtableEntry *entry = NULL;
 
   if (!smt_search(&parser->smt, (char *)token->token_lexeme.lexeme, &entry)) {
     DEBUG_LOG("[DEBUG] check_identifier_in_expr1: identifier '%s' not found "
@@ -348,8 +350,8 @@ static Error check_identifier_in_expr(ParserCtx *parser, const Token *token,
   return SUCCESS;
 }
 
-ExprColumn token_to_column(TokenType t) {
-  switch (t) {
+ExprColumn token_to_column(TokenType tok_type) {
+  switch (tok_type) {
   case T_PLUS_SIGN:
     return EX_PLUS;
   case T_MINUS_SIGN:
@@ -394,10 +396,10 @@ ExprColumn token_to_column(TokenType t) {
 
 TokenType top_terminal(PrecedenceStack *stack) {
   for (int i = stack->top; i >= 0; i--) {
-    TokenType t = stack->items[i];
-    ExprColumn col = token_to_column(t);
+    TokenType tok_type = stack->items[i];
+    ExprColumn col = token_to_column(tok_type);
     if (col != EX_OPERAND && col != EX_COUNT) {
-      return t;
+      return tok_type;
     }
   }
   return T_EOF;
@@ -409,11 +411,11 @@ TokenType top_terminal(PrecedenceStack *stack) {
  * Operandem je identifikátor, číselný či řetězcový literál, `true` nebo
  * `false`.
  *
- * @param t Typ tokenu.
+ * @param tok_type Typ tokenu.
  * @return true, pokud jde o operand.
  */
-static bool is_operand_token(TokenType t) {
-  switch (t) {
+static bool is_operand_token(TokenType tok_type) {
+  switch (tok_type) {
   case T_IDENTIFICATOR:
   case T_INT_LITERAL:
   case T_DOUBLE_LITERAL:
@@ -429,18 +431,22 @@ static bool is_operand_token(TokenType t) {
 /**
  * @brief Zjistí, zda je token otevírací závorka.
  *
- * @param t Typ tokenu.
+ * @param tok_type Typ tokenu.
  * @return true pro `(`.
  */
-static bool is_open_bracket(TokenType t) { return t == T_OPEN_BRACKET; }
+static bool is_open_bracket(TokenType tok_type) {
+  return tok_type == T_OPEN_BRACKET;
+}
 
 /**
  * @brief Zjistí, zda je token uzavírací závorka.
  *
- * @param t Typ tokenu.
+ * @param tok_type Typ tokenu.
  * @return true pro `)`.
  */
-static bool is_close_bracket(TokenType t) { return t == T_CLOSE_BRACKET; }
+static bool is_close_bracket(TokenType tok_type) {
+  return tok_type == T_CLOSE_BRACKET;
+}
 
 /**
  * @brief Zjistí, zda je token binární operátor.
@@ -448,11 +454,11 @@ static bool is_close_bracket(TokenType t) { return t == T_CLOSE_BRACKET; }
  * Operátory jsou `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `<=`, `>`, `>=`, `&&` a
  * `||`.
  *
- * @param t Typ tokenu.
+ * @param tok_type Typ tokenu.
  * @return true, pokud jde o binární operátor.
  */
-static bool is_operator_token(TokenType t) {
-  switch (t) {
+static bool is_operator_token(TokenType tok_type) {
+  switch (tok_type) {
   case T_PLUS_SIGN:
   case T_MINUS_SIGN:
   case T_MULT_SIGN:
@@ -474,11 +480,11 @@ static bool is_operator_token(TokenType t) {
 /**
  * @brief Zjistí, zda je typ číselný.
  *
- * @param t Typ výrazu.
+ * @param expr_type Typ výrazu.
  * @return true pro Int a Double.
  */
-static bool is_numeric(ExprType t) {
-  return t == EXPR_TYPE_INT || t == EXPR_TYPE_DOUBLE;
+static bool is_numeric(ExprType expr_type) {
+  return expr_type == EXPR_TYPE_INT || expr_type == EXPR_TYPE_DOUBLE;
 }
 
 static ExprType int_or_double(ExprType l, ExprType r);
@@ -496,17 +502,17 @@ static ExprType int_or_double(ExprType l, ExprType r);
  *   nesprávném typu; COMPILER_ERR při selhání vložení.
  */
 static Error reduce_not(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
-  ExprType t = EXPR_TYPE_UNKNOWN;
-  ASTNode *n = NULL;
+  ExprType expr_type = EXPR_TYPE_UNKNOWN;
+  ASTNode *node = NULL;
   st->top--;
-  if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &n))
+  if (!tstack_pop(ts, &expr_type) || !ast_stack_pop(as, &node))
     return SYN_ANAL_ERR;
-  if (t != EXPR_TYPE_UNKNOWN && t != EXPR_TYPE_BOOL)
+  if (expr_type != EXPR_TYPE_UNKNOWN && expr_type != EXPR_TYPE_BOOL)
     return STATIC_SEM_TYPE_ERR;
-  ASTNode *u = ast_make_unary(T_NOT, n);
-  if (u)
-    u->expr_type = EXPR_TYPE_BOOL;
-  if (!tstack_push(ts, EXPR_TYPE_BOOL) || !ast_stack_push(as, u))
+  ASTNode *unary = ast_make_unary(T_NOT, node);
+  if (unary)
+    unary->expr_type = EXPR_TYPE_BOOL;
+  if (!tstack_push(ts, EXPR_TYPE_BOOL) || !ast_stack_push(as, unary))
     return COMPILER_ERR;
   return SUCCESS;
 }
@@ -529,22 +535,22 @@ static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
   while (st->top >= 0 && (st->items[st->top] == T_UNARY_MINUS_MARK ||
                           st->items[st->top] == T_UNARY_NOT_MARK)) {
     if (st->items[st->top] == T_UNARY_NOT_MARK) {
-      Error e = reduce_not(st, ts, as);
-      if (e != SUCCESS)
-        return e;
+      Error err = reduce_not(st, ts, as);
+      if (err != SUCCESS)
+        return err;
       continue;
     }
-    ExprType t = EXPR_TYPE_UNKNOWN;
-    ASTNode *n = NULL;
+    ExprType expr_type = EXPR_TYPE_UNKNOWN;
+    ASTNode *node = NULL;
     st->top--;
-    if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &n))
+    if (!tstack_pop(ts, &expr_type) || !ast_stack_pop(as, &node))
       return SYN_ANAL_ERR;
-    if (t != EXPR_TYPE_UNKNOWN && !is_numeric(t))
+    if (expr_type != EXPR_TYPE_UNKNOWN && !is_numeric(expr_type))
       return STATIC_SEM_TYPE_ERR;
-    ASTNode *u = ast_make_unary(T_MINUS_SIGN, n);
-    if (u)
-      u->expr_type = t;
-    if (!tstack_push(ts, t) || !ast_stack_push(as, u))
+    ASTNode *unary = ast_make_unary(T_MINUS_SIGN, node);
+    if (unary)
+      unary->expr_type = expr_type;
+    if (!tstack_push(ts, expr_type) || !ast_stack_push(as, unary))
       return COMPILER_ERR;
   }
   return SUCCESS;
@@ -555,15 +561,15 @@ static Error reduce_unary(PrecedenceStack *st, TypeStack *ts, ASTStack *as) {
  *
  * Je-li aspoň jeden operand Double, výsledek je Double, jinak Int.
  *
- * @param l Typ levého operandu.
- * @param r Typ pravého operandu.
+ * @param left Typ levého operandu.
+ * @param right Typ pravého operandu.
  * @return EXPR_TYPE_DOUBLE nebo EXPR_TYPE_INT.
  */
-static ExprType int_or_double(ExprType l, ExprType r) {
-  if (l == EXPR_TYPE_DOUBLE) {
+static ExprType int_or_double(ExprType left, ExprType right) {
+  if (left == EXPR_TYPE_DOUBLE) {
     return EXPR_TYPE_DOUBLE;
   }
-  if (r == EXPR_TYPE_DOUBLE) {
+  if (right == EXPR_TYPE_DOUBLE) {
     return EXPR_TYPE_DOUBLE;
   }
   return EXPR_TYPE_INT;
@@ -742,7 +748,7 @@ static void skip_eols(ParserCtx *parser) {
  * @param i Pořadí seznamu parametrů od nuly.
  * @return Počet parametrů, nebo -1, pokud takový seznam funkce nemá.
  */
-static int list_size(const symtable_entry *fn, int i) {
+static int list_size(const SymtableEntry *fn, int i) {
   if (i >= fn->f_list_count)
     return -1;
   if (fn->f_list_sizes == NULL)
@@ -750,9 +756,8 @@ static int list_size(const symtable_entry *fn, int i) {
   return fn->f_list_sizes[i];
 }
 
-static Error finish_call(ParserCtx *parser, const char *name,
-                         symtable_entry *fn, ASTNode *recv, ExprType *out_type,
-                         ASTNode **out_node);
+static Error finish_call(ParserCtx *parser, const char *name, SymtableEntry *fn,
+                         ASTNode *recv, ExprType *out_type, ASTNode **out_node);
 
 /**
  * @brief Zparsuje volání funkce, jejíž jméno je aktuální token.
@@ -769,7 +774,7 @@ static Error finish_call(ParserCtx *parser, const char *name,
 static Error parse_call(ParserCtx *parser, ExprType *out_type,
                         ASTNode **out_node) {
   const char *name = parser->current_token.token_lexeme.lexeme;
-  symtable_entry *fn = NULL;
+  SymtableEntry *fn = NULL;
   if (!smt_search(&parser->smt, (char *)name, &fn) || !fn->function) {
     DEBUG_LOG("DEBUG: lexeme not found!: %s\n", name);
     return UNDEF_FN_ERR;
@@ -806,8 +811,8 @@ static Error parse_call(ParserCtx *parser, ExprType *out_type,
  *   SYN_ANAL_ERR nebo LEX_ANAL_ERR při chybné syntaxi; jinak chybový kód z
  *   vnořených funkcí.
  */
-static Error finish_call(ParserCtx *parser, const char *name,
-                         symtable_entry *fn, ASTNode *recv, ExprType *out_type,
+static Error finish_call(ParserCtx *parser, const char *name, SymtableEntry *fn,
+                         ASTNode *recv, ExprType *out_type,
                          ASTNode **out_node) {
   Error deferred = SUCCESS;
   ASTNode *head = recv, *tail = recv;
@@ -843,15 +848,15 @@ static Error finish_call(ParserCtx *parser, const char *name,
 
         skip_eols(parser);
 
-        TokenType t = parser->current_token.token_type;
-        if (t == T_ERROR)
+        TokenType tok_type = parser->current_token.token_type;
+        if (tok_type == T_ERROR)
           return LEX_ANAL_ERR;
-        if (t == T_COMMA) {
+        if (tok_type == T_COMMA) {
           CONSUME_TOKEN_GUARD(parser);
-          t = parser->current_token.token_type;
-          if (t == T_ERROR)
+          tok_type = parser->current_token.token_type;
+          if (tok_type == T_ERROR)
             return LEX_ANAL_ERR;
-          if (t == T_CLOSE_BRACKET)
+          if (tok_type == T_CLOSE_BRACKET)
             return SYN_ANAL_ERR;
           skip_eols(parser);
           if (parser->current_token.token_type == T_ERROR)
@@ -862,7 +867,7 @@ static Error finish_call(ParserCtx *parser, const char *name,
           }
           continue;
         }
-        if (t == T_CLOSE_BRACKET) {
+        if (tok_type == T_CLOSE_BRACKET) {
           CONSUME_TOKEN_GUARD(parser);
           break;
         }
@@ -905,19 +910,19 @@ static Error finish_call(ParserCtx *parser, const char *name,
  * Používá se pro číselné literály, v nichž podtržítko odděluje číslice
  * (`1_000`).
  *
- * @param s Vstupní řetězec ukončený nulovým znakem.
+ * @param str Vstupní řetězec ukončený nulovým znakem.
  * @return Nový řetězec z haldy, který uvolňuje volající; NULL při nedostatku
  *   paměti.
  */
-static char *strip_us(const char *s) {
-  char *r = malloc(strlen(s) + 1), *p = r;
-  if (!r)
+static char *strip_us(const char *str) {
+  char *result = malloc(strlen(str) + 1), *out = result;
+  if (!result)
     return NULL;
-  for (; *s; s++)
-    if (*s != '_')
-      *p++ = *s;
-  *p = 0;
-  return r;
+  for (; *str; str++)
+    if (*str != '_')
+      *out++ = *str;
+  *out = 0;
+  return result;
 }
 
 /**
@@ -926,17 +931,17 @@ static char *strip_us(const char *s) {
  * Metoda `toString` platí pro všechny typy, `toInt` a `floor` pro Double a
  * `length` pro String.
  *
- * @param m Jméno metody.
- * @param t Typ přijímače.
+ * @param member Jméno metody.
+ * @param expr_type Typ přijímače.
  * @return true, pokud jde o vestavěnou metodu.
  */
-static bool is_builtin_member(const char *m, ExprType t) {
-  if (!strcmp(m, "toString"))
+static bool is_builtin_member(const char *member, ExprType expr_type) {
+  if (!strcmp(member, "toString"))
     return true;
-  if (!strcmp(m, "toInt") || !strcmp(m, "floor"))
-    return t == EXPR_TYPE_DOUBLE;
-  if (!strcmp(m, "length"))
-    return t == EXPR_TYPE_STRING;
+  if (!strcmp(member, "toInt") || !strcmp(member, "floor"))
+    return expr_type == EXPR_TYPE_DOUBLE;
+  if (!strcmp(member, "length"))
+    return expr_type == EXPR_TYPE_STRING;
   return false;
 }
 
@@ -947,14 +952,14 @@ static bool is_builtin_member(const char *m, ExprType t) {
  *
  * Klíč má tvar `Typ$metoda`, například `Int$double`.
  *
- * @param t Typ přijímače.
- * @param m Jméno metody.
+ * @param expr_type Typ přijímače.
+ * @param member Jméno metody.
  * @return Nový řetězec z haldy, který uvolňuje volající; NULL pro neznámý typ
  *   nebo při nedostatku paměti.
  */
-static char *ext_method_key(ExprType t, const char *m) {
+static char *ext_method_key(ExprType expr_type, const char *member) {
   const char *tn;
-  switch (t) {
+  switch (expr_type) {
   case EXPR_TYPE_INT:
     tn = "Int";
     break;
@@ -973,10 +978,10 @@ static char *ext_method_key(ExprType t, const char *m) {
   default:
     return NULL;
   }
-  size_t len = strlen(tn) + 1 + strlen(m) + 1;
+  size_t len = strlen(tn) + 1 + strlen(member) + 1;
   char *key = malloc(len);
   if (key != NULL)
-    snprintf(key, len, "%s$%s", tn, m);
+    snprintf(key, len, "%s$%s", tn, member);
   return key;
 }
 
@@ -988,38 +993,38 @@ static char *ext_method_key(ExprType t, const char *m) {
  * metod `toString`, `toInt`, `floor` a `length` se sestaví volání funkcí toStr,
  * toInt, $floor a strLength. Známý typ přijímače se kontroluje.
  *
- * @param p Kontext parseru.
+ * @param parser Kontext parseru.
  * @param ts Zásobník typů.
  * @param as Zásobník uzlů AST.
  * @return SUCCESS; UNDEF_FN_ERR pro neznámou metodu; STATIC_SEM_TYPE_ERR pro
  *   nevhodný typ přijímače; jinak chybový kód z vnořených funkcí.
  */
-static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
-  while (p->current_token.token_type == T_DOT) {
-    CONSUME_TOKEN_GUARD(p);
-    if (p->current_token.token_type == T_ERROR)
+static Error apply_member(ParserCtx *parser, TypeStack *ts, ASTStack *as) {
+  while (parser->current_token.token_type == T_DOT) {
+    CONSUME_TOKEN_GUARD(parser);
+    if (parser->current_token.token_type == T_ERROR)
       return LEX_ANAL_ERR;
-    if (p->current_token.token_type != T_IDENTIFICATOR)
+    if (parser->current_token.token_type != T_IDENTIFICATOR)
       return SYN_ANAL_ERR;
 
-    const char *m = p->current_token.token_lexeme.lexeme;
-    ExprType t = EXPR_TYPE_UNKNOWN;
+    const char *member = parser->current_token.token_lexeme.lexeme;
+    ExprType expr_type = EXPR_TYPE_UNKNOWN;
     ASTNode *recv = NULL;
-    if (!tstack_pop(ts, &t) || !ast_stack_pop(as, &recv))
+    if (!tstack_pop(ts, &expr_type) || !ast_stack_pop(as, &recv))
       return SYN_ANAL_ERR;
 
-    if (!is_builtin_member(m, t)) {
-      char *key = ext_method_key(t, m);
-      symtable_entry *ext = NULL;
-      if (key != NULL && smt_search_global(&p->smt, key, &ext) &&
+    if (!is_builtin_member(member, expr_type)) {
+      char *key = ext_method_key(expr_type, member);
+      SymtableEntry *ext = NULL;
+      if (key != NULL && smt_search_global(&parser->smt, key, &ext) &&
           ext->function) {
-        CONSUME_TOKEN_GUARD(p);
+        CONSUME_TOKEN_GUARD(parser);
         ExprType rt = EXPR_TYPE_UNKNOWN;
         ASTNode *call = NULL;
-        Error e = finish_call(p, key, ext, recv, &rt, &call);
+        Error err = finish_call(parser, key, ext, recv, &rt, &call);
         free(key);
-        if (e != SUCCESS)
-          return e;
+        if (err != SUCCESS)
+          return err;
         if (!tstack_push(ts, rt) || !ast_stack_push(as, call))
           return COMPILER_ERR;
         continue;
@@ -1029,24 +1034,24 @@ static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
 
     const char *fn;
     ExprType res;
-    bool known = (t != EXPR_TYPE_UNKNOWN);
-    if (!strcmp(m, "toString")) {
+    bool known = (expr_type != EXPR_TYPE_UNKNOWN);
+    if (!strcmp(member, "toString")) {
       fn = "toStr";
       res = EXPR_TYPE_STRING;
-    } else if (!strcmp(m, "toInt")) {
+    } else if (!strcmp(member, "toInt")) {
       fn = "toInt";
       res = EXPR_TYPE_INT;
-      if (known && t != EXPR_TYPE_DOUBLE)
+      if (known && expr_type != EXPR_TYPE_DOUBLE)
         return STATIC_SEM_TYPE_ERR;
-    } else if (!strcmp(m, "floor")) {
+    } else if (!strcmp(member, "floor")) {
       fn = "$floor";
       res = EXPR_TYPE_DOUBLE;
-      if (known && t != EXPR_TYPE_DOUBLE)
+      if (known && expr_type != EXPR_TYPE_DOUBLE)
         return STATIC_SEM_TYPE_ERR;
-    } else if (!strcmp(m, "length")) {
+    } else if (!strcmp(member, "length")) {
       fn = "strLength";
       res = EXPR_TYPE_INT;
-      if (known && t != EXPR_TYPE_STRING)
+      if (known && expr_type != EXPR_TYPE_STRING)
         return STATIC_SEM_TYPE_ERR;
     } else {
       return UNDEF_FN_ERR;
@@ -1061,7 +1066,7 @@ static Error apply_member(ParserCtx *p, TypeStack *ts, ASTStack *as) {
     if (!tstack_push(ts, res) || !ast_stack_push(as, call))
       return COMPILER_ERR;
 
-    CONSUME_TOKEN_GUARD(p);
+    CONSUME_TOKEN_GUARD(parser);
   }
   return SUCCESS;
 }
@@ -1156,10 +1161,10 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
     if (is_operand_token(lookahead.token_type) && expect_operand) {
       DEBUG_LOG("[DEBUG] branch: OPERAND token %d\n", lookahead.token_type);
       ASTNode *leaf = NULL;
-      ExprType t = expr_type_from_token(lookahead.token_type);
+      ExprType expr_type = expr_type_from_token(lookahead.token_type);
       bool is_call = false;
       if (lookahead.token_type == T_IDENTIFICATOR) {
-        symtable_entry *sym = NULL;
+        SymtableEntry *sym = NULL;
         is_call = peek_token(parser).token_type == T_OPEN_BRACKET ||
                   (smt_search(&parser->smt,
                               (char *)lookahead.token_lexeme.lexeme, &sym) &&
@@ -1167,24 +1172,24 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       }
 
       if (is_call) {
-        Error err = parse_call(parser, &t, &leaf);
+        Error err = parse_call(parser, &expr_type, &leaf);
         if (err != SUCCESS)
           return err;
       } else if (lookahead.token_type == T_IDENTIFICATOR) {
-        Error err = check_identifier_in_expr(parser, &lookahead, &t);
+        Error err = check_identifier_in_expr(parser, &lookahead, &expr_type);
         if (err != SUCCESS)
           return err;
 
         leaf = ast_create_node(AST_IDENTIFIER);
         leaf->data.string_val = strdup((char *)lookahead.token_lexeme.lexeme);
       } else if (lookahead.token_type == T_INT_LITERAL) {
-        char *c = strip_us(lookahead.token_lexeme.lexeme);
-        leaf = ast_make_int(c ? atoi(c) : 0);
-        free(c);
+        char *clean = strip_us(lookahead.token_lexeme.lexeme);
+        leaf = ast_make_int(clean ? atoi(clean) : 0);
+        free(clean);
       } else if (lookahead.token_type == T_DOUBLE_LITERAL) {
-        char *c = strip_us(lookahead.token_lexeme.lexeme);
-        leaf = ast_make_double(c ? strtod(c, NULL) : 0.0);
-        free(c);
+        char *clean = strip_us(lookahead.token_lexeme.lexeme);
+        leaf = ast_make_double(clean ? strtod(clean, NULL) : 0.0);
+        free(clean);
       } else if (lookahead.token_type == T_STRING_LITERAL) {
         leaf = ast_make_string(strdup((char *)lookahead.token_lexeme.lexeme));
       } else if (lookahead.token_type == T_KW_TRUE ||
@@ -1194,8 +1199,9 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
         leaf = ast_create_node(AST_LITERAL_NULL);
       }
       if (leaf)
-        leaf->expr_type = t;
-      if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf)) {
+        leaf->expr_type = expr_type;
+      if (!tstack_push(&tstack, expr_type) ||
+          !ast_stack_push(&ast_stack, leaf)) {
         return COMPILER_ERR;
       }
       if (!is_call) {
@@ -1216,10 +1222,10 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
       int perr = parse_if_expression(parser, &leaf, &t_int);
       if (perr != SUCCESS)
         return (Error)perr;
-      ExprType t = (ExprType)t_int;
+      ExprType expr_type = (ExprType)t_int;
       if (leaf)
-        leaf->expr_type = t;
-      if (!tstack_push(&tstack, t) || !ast_stack_push(&ast_stack, leaf))
+        leaf->expr_type = expr_type;
+      if (!tstack_push(&tstack, expr_type) || !ast_stack_push(&ast_stack, leaf))
         return COMPILER_ERR;
       expect_operand = false;
       Error merr = apply_member(parser, &tstack, &ast_stack);
@@ -1255,12 +1261,12 @@ Error parse_expression_core(ParserCtx *parser, ASTNode **out_ast,
           stack_pop(&parser->stack);
           bracket_depth--;
 
-          ExprType t = EXPR_TYPE_UNIT;
+          ExprType expr_type = EXPR_TYPE_UNIT;
           ASTNode *unit_node = ast_create_node(AST_LITERAL_UNIT);
 
           unit_node->expr_type = EXPR_TYPE_UNIT;
 
-          if (!tstack_push(&tstack, t) ||
+          if (!tstack_push(&tstack, expr_type) ||
               !ast_stack_push(&ast_stack, unit_node)) {
             return COMPILER_ERR;
           }
