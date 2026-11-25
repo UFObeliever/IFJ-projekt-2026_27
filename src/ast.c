@@ -10,17 +10,17 @@
  */
 
 #include "ast.h"
+#include "error.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 ASTNode *ast_create_node(ASTNodeType type) {
-  ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+  ASTNode *node = calloc(1, sizeof(ASTNode));
   if (node == NULL) {
-    return NULL;
+    fprintf(stderr, "Chyba alokace pameti pro uzel AST\n");
+    exit(COMPILER_ERR);
   }
-
   node->type = type;
-  node->next = NULL;
-
   return node;
 }
 
@@ -51,10 +51,33 @@ void ast_free(ASTNode *node) {
     ast_free(node->data.while_loop.body);
     break;
 
-  case AST_IDENTIFIER:
-    free(node->data.string_val);
+  case AST_PROGRAM:
+  case AST_BLOCK:
+    ast_free(node->data.block.statements);
     break;
 
+  case AST_FUNC_DEF:
+    free(node->data.func_def.name);
+    ast_free(node->data.func_def.params);
+    ast_free(node->data.func_def.body);
+    break;
+
+  case AST_VAR_DECL:
+  case AST_ASSIGNMENT:
+    free(node->data.var_assign.identifier);
+    ast_free(node->data.var_assign.expression);
+    break;
+
+  case AST_RETURN:
+    ast_free(node->data.return_stmt.expression);
+    break;
+
+  case AST_FUNC_CALL:
+    free(node->data.func_call.name);
+    ast_free(node->data.func_call.arguments);
+    break;
+
+  case AST_IDENTIFIER:
   case AST_LITERAL_STRING:
     free(node->data.string_val);
     break;

@@ -15,13 +15,14 @@ int main(void) {
   parser.main_count = 0;
   parser.funcs = NULL;
   parser.funcs_tail = NULL;
+  parser.for_count = 0;
 
   int result = parse_program(&parser);
-  if (result == 0) {
-    ASTNode *root = ast_create_node(AST_PROGRAM);
-    root->data.block.statements = parser.funcs;
+  ASTNode *root = ast_create_node(AST_PROGRAM);
+  root->data.block.statements = parser.funcs;
+  if (result == 0)
     result = generate_program(root, stdout);
-  }
+  ast_free(root);
 
   smt_dispose(&parser.smt);
 

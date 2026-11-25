@@ -39,6 +39,7 @@ typedef struct ParserCtx {
   size_t tokens_len;
   size_t tokens_cap;
   size_t pos;
+  int for_count;
 } ParserCtx;
 
 /**

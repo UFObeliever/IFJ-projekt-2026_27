@@ -37,6 +37,8 @@ symtable_entry *symtable_entry_init(void) {
 void symtable_entry_dispose(symtable_entry *entry) {
   if (entry != NULL) {
     if (entry->function && entry->f_params != NULL) {
+      for (int i = 0; i < entry->f_param_count; i++)
+        free(entry->f_params[i].name);
       free(entry->f_params);
     }
     free(entry->f_list_sizes);
