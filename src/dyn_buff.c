@@ -12,7 +12,6 @@
 
 #include "dyn_buff.h"
 #include <assert.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -57,32 +56,14 @@ void sb_append_char(StringBuff *buf, char c) {
 const char *sb_copy(const StringBuff *buf) {
   if (buf == NULL) {
     return NULL;
-  };
+  }
   char *copy = (char *)malloc(buf->length + 1);
   if (copy == NULL) {
     exit(99);
-  };
+  }
   memcpy(copy, buf->data, buf->length);
   copy[buf->length] = '\0';
   return (const char *)copy;
-}
-
-void sb_remove_trailing_whitespace(StringBuff *buff) {
-  buff->length -= 2;
-  const size_t orig_len = buff->length;
-  for (size_t i = 0; i < orig_len; i++) {
-
-    if (buff->data[orig_len - i] == '\n') {
-      return;
-    }
-
-    if (isspace(buff->data[orig_len - i])) {
-      buff->length--;
-      continue;
-    }
-
-    return;
-  }
 }
 
 void sb_append_str(StringBuff *buf, const char *str) {
