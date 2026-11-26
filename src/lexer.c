@@ -341,7 +341,6 @@ static Token lex_white_space(LexerCtx *ctx) {
   State current_state = STATE_INDENT;
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     switch (current_state) {
     case STATE_INDENT:
       if (c == '\t') {
@@ -352,7 +351,6 @@ static Token lex_white_space(LexerCtx *ctx) {
         continue; // CR (konce řádků z Windows) ignorujeme
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_INDENTS(num_indents);
       }
       break;
@@ -365,7 +363,6 @@ static Token lex_white_space(LexerCtx *ctx) {
         return MAKE_TOKEN(T_EOF);
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_ERROR();
       }
       break;
@@ -394,7 +391,6 @@ static Token lex_identificator(LexerCtx *ctx) {
   State current_state = STATE_START;
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
 
     char input_char = (char)c;
     switch (current_state) {
@@ -420,7 +416,6 @@ static Token lex_identificator(LexerCtx *ctx) {
       if (c == '_' || isalpha(c) || isdigit(c)) {
         sb_append_char(&ctx->buffer, input_char);
       } else {
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         ungetc(c, ctx->input);
         return keyword_check(ctx);
       }
@@ -453,7 +448,6 @@ static Token lex_numbers(LexerCtx *ctx) {
 
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     char input_char = (char)c;
     switch (current_state) {
     case STATE_START:
@@ -538,7 +532,6 @@ static Token lex_numbers(LexerCtx *ctx) {
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->buffer);
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->buffer);
       }
       break;
@@ -576,7 +569,6 @@ static Token lex_numbers(LexerCtx *ctx) {
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->buffer);
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back %c (%d)\n", (char)c, c);
         return MAKE_TOKEN_LEXEME(T_DOUBLE_LITERAL, &ctx->buffer);
       }
       break;
@@ -616,7 +608,6 @@ static Token lex_string(LexerCtx *ctx) {
   State current_state = STATE_START;
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     char input_char = (char)c;
     switch (current_state) {
     case STATE_START:
@@ -678,7 +669,6 @@ static Token lex_string(LexerCtx *ctx) {
         current_state = STATE_MULTILINE_STRING;
       } else {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_LEXEME(T_STRING_LITERAL, &ctx->buffer);
       }
       break;
@@ -764,8 +754,6 @@ static Token lex_div_com(LexerCtx *ctx) {
   int comment_nesting = 0;
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("current state: %d\n", current_state);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     switch (current_state) {
     case STATE_SLASH:
       if (c == '/') {
@@ -811,7 +799,6 @@ static Token lex_div_com(LexerCtx *ctx) {
         continue;
       } else if (c == EOF) {
         ungetc(c, ctx->input);
-        DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         return MAKE_TOKEN_ERROR();
       } else if (c == '\n') {
         current_state = STATE_BLOCK_COMMENT_NEWLINE;
@@ -823,7 +810,6 @@ static Token lex_div_com(LexerCtx *ctx) {
     case STATE_BLOCK_COMMENT_SLASH:
       if (c == '*') {
         comment_nesting++;
-        DEBUG_LOG("Number of iterations %d", comment_nesting);
         current_state = STATE_BLOCK_COMMENT;
       } else if (c == '/') {
         continue;
@@ -867,7 +853,6 @@ static Token lex_div_com(LexerCtx *ctx) {
       if (c == '\n' || c == EOF) {
         if (c == EOF) {
           ungetc(c, ctx->input);
-          DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
         }
         return MAKE_TOKEN(T_EOL);
       } else if (c == ' ' || c == '\t' || c == '\r') {
@@ -908,12 +893,10 @@ static Token lex_div_com(LexerCtx *ctx) {
  */
 static Token lex_equal(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
     return MAKE_TOKEN(T_EQUAL);
   } else {
     ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     return MAKE_TOKEN(T_ASSIGN);
   }
 }
@@ -928,12 +911,10 @@ static Token lex_equal(LexerCtx *ctx) {
  */
 static Token lex_compare_lesser(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
     return MAKE_TOKEN(T_LTE);
   } else {
     ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     return MAKE_TOKEN(T_LT);
   }
 }
@@ -948,12 +929,10 @@ static Token lex_compare_lesser(LexerCtx *ctx) {
  */
 static Token lex_compare_greater(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
     return MAKE_TOKEN(T_GTE);
   } else {
     ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     return MAKE_TOKEN(T_GT);
   }
 }
@@ -968,12 +947,10 @@ static Token lex_compare_greater(LexerCtx *ctx) {
  */
 static Token lex_not_equal(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '=') {
     return MAKE_TOKEN(T_NOT_EQUAL);
   } else {
     ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     return MAKE_TOKEN(T_NOT);
   }
 }
@@ -988,12 +965,10 @@ static Token lex_not_equal(LexerCtx *ctx) {
  */
 static Token lex_and(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '&') {
     return MAKE_TOKEN(T_AND);
   }
   ungetc(c, ctx->input);
-  DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
   return MAKE_TOKEN_ERROR();
 }
 
@@ -1007,12 +982,10 @@ static Token lex_and(LexerCtx *ctx) {
  */
 static Token lex_or(LexerCtx *ctx) {
   int c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == '|') {
     return MAKE_TOKEN(T_OR);
   }
   ungetc(c, ctx->input);
-  DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
   return MAKE_TOKEN_ERROR();
 }
 
@@ -1029,7 +1002,6 @@ static Token lex_main_func(LexerCtx *ctx) {
   State current_state = STATE_AT;
   while (1) {
     int c = fgetc(ctx->input);
-    DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
     switch (current_state) {
     case STATE_AT:
       if (c == 'm') {
@@ -1432,7 +1404,6 @@ static Token lex_token(LexerCtx *ctx) {
   int c;
   sb_reset(&ctx->buffer);
   c = fgetc(ctx->input);
-  DEBUG_LOG("dealing with char: '%c' (%d)\n", (char)c, c);
   if (c == EOF) {
     return MAKE_TOKEN(T_EOF);
   }
@@ -1440,7 +1411,6 @@ static Token lex_token(LexerCtx *ctx) {
     c = fgetc(ctx->input);
   }
   if (c == ' ') {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     return lex_white_space(ctx);
   }
@@ -1452,7 +1422,6 @@ static Token lex_token(LexerCtx *ctx) {
     return MAKE_TOKEN_TAB();
   }
   if (c == '_' || isalpha(c)) {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     Token id = lex_identificator(ctx);
     if (id.token_type == T_IDENTIFICATOR &&
@@ -1470,7 +1439,6 @@ static Token lex_token(LexerCtx *ctx) {
     return MAKE_TOKEN(T_EOL);
   }
   if (c == '0' || isdigit(c)) {
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     ungetc(c, ctx->input);
     return lex_numbers(ctx);
   }
@@ -1482,7 +1450,6 @@ static Token lex_token(LexerCtx *ctx) {
   }
   if (c == '"') {
     ungetc(c, ctx->input);
-    DEBUG_LOG("putting char back: '%c' (%d)\n", (char)c, c);
     return lex_string(ctx);
   }
   if (c == ',') {
