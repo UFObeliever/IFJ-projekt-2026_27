@@ -1,5 +1,5 @@
 /**
- * @file dyn_buff.h
+ * @file error.h
  *
  * Překladač jazyka IFJ26
  *
